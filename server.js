@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const multer = require('multer');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SECRET = 'supersecret';
@@ -16,6 +17,7 @@ app.use(bodyParser.json());
 
 const users = {}; // In-memory users store
 const userHighlights = {}; // In-memory highlights store
+const upload = multer({ dest: 'uploads/' }); // Uploaded files will go here
 
 // Signup
 app.post('/signup', async (req, res) => {
@@ -53,12 +55,37 @@ function authenticate(req, res, next) {
 }
 
 // POST /user-highlights
-app.post('/user-highlights', authenticate, (req, res) => {
-  const { highlights } = req.body; // expect array of strings
-  if (!Array.isArray(highlights)) return res.status(400).json({ message: 'Invalid highlights format' });
-  userHighlights[req.user.username].push(...highlights);
-  res.json({ message: 'Highlights saved' });
+// app.post('/user-highlights', authenticate, (req, res) => {
+// enable above post with authentication for deployment  version with login/signup
+
+// write a function to parse the  highlights from the uploaded file
+function parseHighlights(fileContent) {
+// #todo
+}
+
+app.post('/user-highlights', upload.single('file'), (req, res) => {
+  const file = req.file;
+  if (!file) return res.status(400).json({ message: 'No file uploaded' });
+
+  const filePath = path.join(__dirname, file.path);
+  console.log(file)
+  console.log('File uploaded:', filePath);
+  console.log('File name:', file.originalname);
+  fs.readFile(filePath, 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading uploaded file:', err);
+      return res.status(500).json({ message: 'Error reading file' });
+    }
+
+    const highlights = parseHighlights(data);
+
+    // Delete the uploaded file if you don't need to store it
+    fs.unlink(filePath, () => {});
+
+    res.json({ message: 'Highlights received and parsed' });
+  });
 });
+
 
 // GET /formatted-highlights
 app.get('/formatted-highlights', authenticate, (req, res) => {

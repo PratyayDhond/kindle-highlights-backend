@@ -21,6 +21,7 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "mocha": "^11.5.0",
+    "multer": "^2.0.0",
     "supertest": "^7.1.1"
   }
 }
