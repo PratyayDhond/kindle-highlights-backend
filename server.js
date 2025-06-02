@@ -11,7 +11,8 @@ const multer = require('multer');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SECRET = 'supersecret';
-
+const parseHighlights = require('./parseHighlights.js'); // Import the highlight parsing function
+const getHighlightsZip = require('./getHighlightsZip.js'); // Import the function to create zip from highlights
 app.use(cors());
 app.use(bodyParser.json());
 
@@ -59,9 +60,7 @@ function authenticate(req, res, next) {
 // enable above post with authentication for deployment  version with login/signup
 
 // write a function to parse the  highlights from the uploaded file
-function parseHighlights(fileContent) {
-// #todo
-}
+
 
 app.post('/user-highlights', upload.single('file'), (req, res) => {
   const file = req.file;
@@ -77,12 +76,12 @@ app.post('/user-highlights', upload.single('file'), (req, res) => {
       return res.status(500).json({ message: 'Error reading file' });
     }
 
-    const highlights = parseHighlights(data);
-
-    // Delete the uploaded file if you don't need to store it
+    const highlights = parseHighlights.parseHighlights(data); // Call the parsing function
     fs.unlink(filePath, () => {});
+    
+    highlightsZip = getHighlightsZip(highlights);
 
-    res.json({ message: 'Highlights received and parsed' });
+    res.json({ message: 'Highlights received and parsed', highlights: highlights });
   });
 });
 
