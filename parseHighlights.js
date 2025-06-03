@@ -1,5 +1,5 @@
 const e = require("express");
-
+const {setBookCount} = require('./progress.js');
 const books = []; // an array of objects
 
 function parseBookNameAndAuthor(bookNameAndAuthor) {
@@ -180,7 +180,8 @@ function parseHighlights(fileContent) {
             i++;
         }
     }
-
+    setBookCount(books.length);
+    console.log('Parsing completed. Total books:', books.length);
     return books;
 }
 

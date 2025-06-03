@@ -8,11 +8,14 @@ const path = require('path');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const multer = require('multer');
+const { v4: uuidv4 } = require('uuid'); // npm install uuid
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SECRET = 'supersecret';
 const parseHighlights = require('./parseHighlights.js'); // Import the highlight parsing function
 const getHighlightsZip = require('./getHighlightsZip.js'); // Import the function to create zip from highlights
+const {setProgress, deleteProgress, getProgress} = require('./progress.js');
+
 app.use(cors());
 app.use(bodyParser.json());
 
@@ -63,13 +66,17 @@ function authenticate(req, res, next) {
 
 
 app.post('/user-highlights', upload.single('file'), async (req, res) => {
+  const jobId = uuidv4();
+  setProgress(jobId, 0); // Initialize progress for this job
+  res.json({ jobId }); // Immediately respond with jobId
+
   const file = req.file;
   if (!file) return res.status(400).json({ message: 'No file uploaded' });
 
   const filePath = path.join(__dirname, file.path);
-  console.log(file)
-  console.log('File uploaded:', filePath);
-  console.log('File name:', file.originalname);
+  // console.log(file)
+  // console.log('File uploaded:', filePath);
+  // console.log('File name:', file.originalname);
   fs.readFile(filePath, 'utf8', async (err, data) => {
     if (err) {
       console.error('Error reading uploaded file:', err);
@@ -80,39 +87,59 @@ app.post('/user-highlights', upload.single('file'), async (req, res) => {
     fs.unlink(filePath, () => {});
 
     // Await the zip creation and get the path
-    const highlightsZipPath = await getHighlightsZip(highlights);
-
+    // const highlightsZipPath = await getHighlightsZip(highlights, jobId);
+    await getHighlightsZip(highlights, jobId);
+    setProgress(jobId, 100); 
     // Send the zip file for download
-    res.download(highlightsZipPath, 'kindle-clippings.zip', (err) => {
+    // res.download(highlightsZipPath, 'kindle-clippings.zip', (err) => {
+      // if (err) {
+        // console.error('Error sending zip:', err);
+        // res.status(500).json({ message: 'Error sending zip file' });
+      // }
+      // Optionally, delete the zip after sending
+      // fs.unlink(highlightsZipPath, () => {});
+    // });
+  });
+});
+
+app.get('/download-highlights/:jobId', (req, res) => {
+  const jobId = req.params.jobId;
+  const highlightsZipPath = `./${jobId}.zip`; // Assuming the zip is named with jobId
+  console.log("Inside download-highlights");
+  console.log("Highlights zip path:", highlightsZipPath);
+  if (fs.existsSync(highlightsZipPath)) {
+    console.log("Inside if condition of download-highlights");
+    res.download(highlightsZipPath, `${jobId}.zip`, (err) => {
       if (err) {
         console.error('Error sending zip:', err);
         res.status(500).json({ message: 'Error sending zip file' });
       }
       // Optionally, delete the zip after sending
-      // fs.unlink(highlightsZipPath, () => {});
+      fs.unlink(highlightsZipPath, () => {});
     });
-  });
+  } else {
+    res.status(404).json({ message: 'Highlights not found' });
+  }
 });
 
 
-// GET /formatted-highlights
-app.get('/formatted-highlights', authenticate, (req, res) => {
-  const highlights = userHighlights[req.user.username] || [];
-  const formatted = highlights.map((h, i) => `${i + 1}. ${h}`).join('\n');
-  const filePath = path.join(__dirname, `${req.user.username}-highlights.zip`);
-  fs.writeFileSync(path.join(__dirname, `${req.user.username}.txt`), formatted);
-  const archiver = require('archiver');
-  const output = fs.createWriteStream(filePath);
-  const archive = archiver('zip', { zlib: { level: 9 } });
-  archive.pipe(output);
-  archive.file(path.join(__dirname, `${req.user.username}.txt`), { name: 'highlights.txt' });
-  archive.finalize();
-  output.on('close', () => {
-    res.download(filePath, 'highlights.zip', () => {
-      fs.unlinkSync(path.join(__dirname, `${req.user.username}.txt`));
-      fs.unlinkSync(filePath);
-    });
+// Progress endpoint
+app.get('/progress/:jobId', (req, res) => {
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
   });
+  const jobId = req.params.jobId;
+  const interval = setInterval(() => {
+    const progress = getProgress(jobId);
+    res.write(`data: ${progress}\n\n`);
+    if (progress >= 100) {
+      clearInterval(interval);
+      res.end();
+      deleteProgress(jobId);
+    }
+  }, 500);
 });
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

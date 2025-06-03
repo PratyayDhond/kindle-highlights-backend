@@ -2,6 +2,7 @@ const { Worker } = require('worker_threads');
 const fs = require('fs');
 const path = require('path');
 const { mdToPdf } = require('md-to-pdf');
+const {setProgress, getBookCount, getProgress} = require('./progress.js');
 // const pLimit = require('p-limit');
 // const limit = pLimit(3); // Try 2 or 3, adjust as needed
 
@@ -20,9 +21,13 @@ const { mdToPdf } = require('md-to-pdf');
 //     });
 // }
 
-function createMarkdownFiles(highlights) {
+function createMarkdownFiles(highlights, jobId) {
     console.timeLog('getHighlightsZip', 'Started createMarkdownFiles');
 
+    const totalProgessForThisModule = 15
+    const bookCount = getBookCount();
+    const progressPerBook = totalProgessForThisModule / bookCount;
+    console.log(`Progress per book: ${progressPerBook}`);
     const markdownContent = [];
     for (const book of highlights) {
         const name = book.name;
@@ -55,10 +60,13 @@ function createMarkdownFiles(highlights) {
                 metadata += ` &nbsp;|&nbsp; *Added on ${highlight.timestamp}*`;
 
                 content += `${metadata}\n\n&nbsp;\n\n\n`;
+
+
             }
         });
         markdownContent.push({ name, content });
-        console.log(`Created markdown content for: ${name}`);
+        setProgress(jobId, getProgress(jobId) + progressPerBook);
+        // console.log(`CURRENT PROGRESS: ${getProgress(jobId)}`);        // console.log(`Created markdown content for: ${name}`);
         // tasks.push(limit(() => runPdfWorker(content, dest)));
     }
 
@@ -66,25 +74,33 @@ function createMarkdownFiles(highlights) {
     return markdownContent;
 }
 
-async function createPdfsFromMarkdownList(markdownContent) {
+async function createPdfsFromMarkdownList(markdownContent, jobId) {
     console.timeLog('getHighlightsZip', 'Started createPdfsFromMarkdownList');
+
+    const totalProgessForThisModule = 70
+    const bookCount = getBookCount();
+    const progressPerBook = totalProgessForThisModule / bookCount;
+    console.log(`Progress per book: ${progressPerBook}`);
+
     if (!fs.existsSync('./highlights')) fs.mkdirSync('./highlights');
 
     for (const { name, content } of markdownContent) {
         const dest = `./highlights/${name}.pdf`;
-        console.log('Creating PDF for:', name);
         await mdToPdf({ content }, { dest });
+        setProgress(jobId, getProgress(jobId) + progressPerBook);
+        console.log(`PDF created for: ${name}`);
     }
     console.timeLog('getHighlightsZip', 'Finished createPdfsFromMarkdownList');
 }
 
-async function getHighlightsZip(highlights) {
+async function getHighlightsZip(highlights, jobId) {
     console.time('getHighlightsZip');
-    const markdownContentList = createMarkdownFiles(highlights);
-    await createPdfsFromMarkdownList(markdownContentList);
+    const markdownContentList = createMarkdownFiles(highlights, jobId);
+    console.log("Current Progress:", getProgress(jobId));
+    await createPdfsFromMarkdownList(markdownContentList, jobId);
     // Create a zip file containing all the PDF files
     const zip = require('adm-zip');
-    const zipFilePath = './kindle-clippings.zip'; // update this with username-clippings.zip in future for multiple users.
+    const zipFilePath = `./${jobId}.zip`; // update this with username-clippings.zip in future for multiple users.
     const zipFile = new zip();
     const files = fs.readdirSync('./highlights');
     files.forEach(file => {
