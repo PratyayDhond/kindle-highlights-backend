@@ -153,12 +153,12 @@ function parseHighlights(fileContent) {
         [page, location, timestamp, currentNoteType] = parsePageLocationTimestamp(dataLine2);
 
         i+= 1; // skip the next line which is a separator
-        console.log("Current Line:", rawData[i]);
+        // console.log("Current Line:", rawData[i]);
         while( i < rawData.length && rawData[i].trim() !== note_sep){
             currentNote += rawData[i].trim() + '\n';
             i++;
         }
-        console.log("Current Note:", currentNote);
+        // console.log("Current Note:", currentNote);   
         // remove the last newline character    
         if (currentNote.length > 0 && currentNote[currentNote.length - 1] === '\n') {
             currentNote = currentNote.slice(0, -1);

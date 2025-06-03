@@ -62,7 +62,7 @@ function authenticate(req, res, next) {
 // write a function to parse the  highlights from the uploaded file
 
 
-app.post('/user-highlights', upload.single('file'), (req, res) => {
+app.post('/user-highlights', upload.single('file'), async (req, res) => {
   const file = req.file;
   if (!file) return res.status(400).json({ message: 'No file uploaded' });
 
@@ -70,7 +70,7 @@ app.post('/user-highlights', upload.single('file'), (req, res) => {
   console.log(file)
   console.log('File uploaded:', filePath);
   console.log('File name:', file.originalname);
-  fs.readFile(filePath, 'utf8', (err, data) => {
+  fs.readFile(filePath, 'utf8', async (err, data) => {
     if (err) {
       console.error('Error reading uploaded file:', err);
       return res.status(500).json({ message: 'Error reading file' });
@@ -78,10 +78,19 @@ app.post('/user-highlights', upload.single('file'), (req, res) => {
 
     const highlights = parseHighlights.parseHighlights(data); // Call the parsing function
     fs.unlink(filePath, () => {});
-    
-    highlightsZip = getHighlightsZip(highlights);
 
-    res.json({ message: 'Highlights received and parsed', highlights: highlights });
+    // Await the zip creation and get the path
+    const highlightsZipPath = await getHighlightsZip(highlights);
+
+    // Send the zip file for download
+    res.download(highlightsZipPath, 'kindle-clippings.zip', (err) => {
+      if (err) {
+        console.error('Error sending zip:', err);
+        res.status(500).json({ message: 'Error sending zip file' });
+      }
+      // Optionally, delete the zip after sending
+      // fs.unlink(highlightsZipPath, () => {});
+    });
   });
 });
 
