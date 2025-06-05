@@ -140,7 +140,7 @@ app.get('/download-highlights/:jobId', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.send('Welcome to the Kindle Highlights API! Use /signup to create an account, /login to log in, and /user-highlights to upload your highlights file.');
+  res.send('Welcome to the Kindle Highlights API! If you see this, the server is up and running.');
 });
 
 app.get('/health-check', (req,res) => {
