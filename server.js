@@ -22,6 +22,23 @@ app.use(bodyParser.json());
 const users = {}; // In-memory users store
 const userHighlights = {}; // In-memory highlights store
 const upload = multer({ dest: 'uploads/' }); // Uploaded files will go here
+const FRONTEND_URL = 'https://kindle-clippings.dhondpratyay.workers.dev';
+const allowedOrigins = [
+  FRONTEND_URL,
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
+];
+
+app.use(cors({
+  origin: function(origin, callback){
+    // allow requests with no origin (like mobile apps, curl, etc.)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  }
+}));
 
 // Signup
 app.post('/signup', async (req, res) => {
@@ -134,7 +151,7 @@ app.get('/health-check', (req,res) => {
 // Progress endpoint
 app.get('/progress/:jobId', (req, res) => {
   const allowedOrigins = [
-    'https://kindle-clippings.dhondpratyay.workers.dev',
+    FRONTEND_URL,
     'http://localhost:3000',
     'http://127.0.0.1:3000'
   ];
