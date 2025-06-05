@@ -133,11 +133,20 @@ app.get('/health-check', (req,res) => {
 
 // Progress endpoint
 app.get('/progress/:jobId', (req, res) => {
-  res.set({
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive'
-  });
+  const allowedOrigins = [
+    'https://kindle-clippings.dhondpratyay.workers.dev',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000'
+  ];
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  // res.setHeader('Access-Control-Allow-Credentials', 'true'); // Uncomment if needed
+
   const jobId = req.params.jobId;
   const interval = setInterval(() => {
     const progress = getProgress(jobId);
