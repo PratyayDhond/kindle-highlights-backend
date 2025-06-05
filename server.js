@@ -122,6 +122,10 @@ app.get('/download-highlights/:jobId', (req, res) => {
   }
 });
 
+app.get('/health-check', (req,res) => {
+  console.log('Health check endpoint hit from', req.ip);
+  res.status(200).json({ status: 'alive', isHealthy: true });
+});
 
 // Progress endpoint
 app.get('/progress/:jobId', (req, res) => {
