@@ -122,6 +122,10 @@ app.get('/download-highlights/:jobId', (req, res) => {
   }
 });
 
+app.get('/', (req, res) => {
+  res.send('Welcome to the Kindle Highlights API! Use /signup to create an account, /login to log in, and /user-highlights to upload your highlights file.');
+});
+
 app.get('/health-check', (req,res) => {
   console.log('Health check endpoint hit from', req.ip);
   res.status(200).json({ status: 'alive', isHealthy: true });
