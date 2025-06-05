@@ -8,8 +8,7 @@
   },
   "scripts": {
     "test": "mocha test/*.test.js",
-    "start": "node server.js",
-    "postinstall": "apt-get update && apt-get install -y chromium"
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
@@ -26,6 +25,7 @@
     "mocha": "^11.5.0",
     "multer": "^2.0.0",
     "p-limit": "^2.3.0",
+    "puppeteer": "^21.3.8",
     "supertest": "^7.1.1",
     "uuid": "^11.1.0",
     "vercel": "^42.3.0"
