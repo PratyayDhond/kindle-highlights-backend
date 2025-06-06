@@ -86,7 +86,16 @@ async function createPdfsFromMarkdownList(markdownContent, jobId) {
 
     for (const { name, content } of markdownContent) {
         const dest = `./highlights/${name}.pdf`;
-        await mdToPdf({ content }, { dest });
+        await mdToPdf(
+          { content },
+          {
+            dest,
+            launch_options: {
+              args: ['--no-sandbox'],
+              headless: 'new' // Optional, but recommended for future compatibility
+            }
+          }
+        );
         setProgress(jobId, getProgress(jobId) + progressPerBook);
         console.log(`PDF created for: ${name}`);
     }

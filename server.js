@@ -25,8 +25,8 @@ const upload = multer({ dest: 'uploads/' }); // Uploaded files will go here
 const FRONTEND_URL = 'https://kindle-clippings.dhondpratyay.workers.dev';
 const allowedOrigins = [
   FRONTEND_URL,
-  'http://localhost:3000',
-  'http://127.0.0.1:3000'
+  'http://localhost:8080',
+  'http://127.0.0.1:8080'
 ];
 
 app.use(cors({
@@ -152,8 +152,8 @@ app.get('/health-check', (req,res) => {
 app.get('/progress/:jobId', (req, res) => {
   const allowedOrigins = [
     FRONTEND_URL,
-    'http://localhost:3000',
-    'http://127.0.0.1:3000'
+    'http://localhost:8080',
+    'http://127.0.0.1:8080'
   ];
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
