@@ -25,8 +25,8 @@ const upload = multer({ dest: 'uploads/' }); // Uploaded files will go here
 const FRONTEND_URL = 'https://kindle-clippings.dhondpratyay.workers.dev';
 const allowedOrigins = [
   FRONTEND_URL,
-  'http://localhost:3000',
-  'http://127.0.0.1:3000'
+  'http://localhost:8080',
+  'http://127.0.0.1:8080'
 ];
 
 app.use(cors({
@@ -119,6 +119,29 @@ app.post('/user-highlights', upload.single('file'), async (req, res) => {
   });
 });
 
+app.post('/get-user-highlights-json', upload.single('file'), (req, res) => {
+  const file = req.file;
+  console.log('Inside get-user-highlights-json');
+  console.log('File:', file);
+  console.log('File path:', file.path);
+  console.log('File originalname:', file.originalname);
+  if (!file) return res.status(400).json({ message: 'No file uploaded' });
+  const filePath = path.join(__dirname, file.path);
+  console.log('File uploaded:', filePath);
+  var highlights = []
+  fs.readFile(filePath, 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading uploaded file:', err);
+      return res.status(500).json({ message: 'Error reading file' });
+    }
+    highlights = parseHighlights.parseHighlights(data); // Call the parsing function
+     fs.unlink(filePath, () => {});
+  console.log('Highlights:', highlights);
+  return res.json({ message: 'Highlights processed successfully', highlights: highlights });
+  });
+  
+});
+
 app.get('/download-highlights/:jobId', (req, res) => {
   const jobId = req.params.jobId;
   const highlightsZipPath = `./${jobId}.zip`; // Assuming the zip is named with jobId
@@ -152,8 +175,8 @@ app.get('/health-check', (req,res) => {
 app.get('/progress/:jobId', (req, res) => {
   const allowedOrigins = [
     FRONTEND_URL,
-    'http://localhost:3000',
-    'http://127.0.0.1:3000'
+    'http://localhost:8080',
+    'http://127.0.0.1:8080'
   ];
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
