@@ -14,8 +14,9 @@
   "author": "",
   "license": "ISC",
   "engines": {
-    "node": ">=18"
-  },"dependencies": {
+    "node": ">=18 <21"
+  },
+  "dependencies": {
     "adm-zip": "^0.5.16",
     "archiver": "^7.0.1",
     "bcrypt": "^6.0.0",
