@@ -13,27 +13,10 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "engines": {
-    "node": ">=18 <21"
-  },
   "dependencies": {
-    "adm-zip": "^0.5.16",
-    "archiver": "^7.0.1",
-    "bcrypt": "^6.0.0",
-    "body-parser": "^2.2.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "jsonwebtoken": "^9.0.2",
     "md-to-pdf": "^5.2.4",
-    "mocha": "^11.5.0",
-    "multer": "^2.0.0",
-    "p-limit": "^2.3.0",
-    "puppeteer": "^21.3.8",
-    "supertest": "^7.1.1",
-    "uuid": "^11.1.0",
-    "vercel": "^42.3.0"
-  },
-  "puppeteer": {
-    "default_browser_revision": "136.0.7103.94"
+    "multer": "^2.0.1"
   }
 }

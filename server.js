@@ -5,13 +5,11 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid'); // npm install uuid
 const app = express();
 const PORT = process.env.PORT || 3000;
-const SECRET = 'supersecret';
+// const SECRET = 'supersecret';
 const parseHighlights = require('./parseHighlights.js'); // Import the highlight parsing function
 const getHighlightsZip = require('./getHighlightsZip.js'); // Import the function to create zip from highlights
 const {setProgress, deleteProgress, getProgress} = require('./progress.js');
@@ -40,40 +38,35 @@ app.use(cors({
   }
 }));
 
-// Signup
-app.post('/signup', async (req, res) => {
-  const { username, password } = req.body;
-  if (users[username]) return res.status(400).json({ message: 'User already exists' });
-  const hashed = await bcrypt.hash(password, 10);
-  users[username] = { username, password: hashed };
-  userHighlights[username] = [];
-  res.status(201).json({ message: 'Signup successful' });
-});
+// // Signup
+// app.post('/signup', async (req, res) => {
+//   res.status(201).json({ message: 'Signup successful' });
+// });
 
-// Login
-app.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  const user = users[username];
-  if (!user) return res.status(401).json({ message: 'Invalid credentials' });
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) return res.status(401).json({ message: 'Invalid credentials' });
-  const token = jwt.sign({ username }, SECRET, { expiresIn: '1h' });
-  res.json({ token });
-});
+// // Login
+// app.post('/login', async (req, res) => {
+//   const { username, password } = req.body;
+//   const user = users[username];
+//   if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+//   const match = await bcrypt.compare(password, user.password);
+//   if (!match) return res.status(401).json({ message: 'Invalid credentials' });
+//   const token = jwt.sign({ username }, SECRET, { expiresIn: '1h' });
+//   res.json({ token });
+// });
 
 // Middleware to verify JWT
-function authenticate(req, res, next) {
-  const auth = req.headers.authorization;
-  if (!auth) return res.status(401).json({ message: 'No token provided' });
-  const token = auth.split(' ')[1];
-  try {
-    const decoded = jwt.verify(token, SECRET);
-    req.user = decoded;
-    next();
-  } catch {
-    res.status(401).json({ message: 'Invalid token' });
-  }
-}
+// function authenticate(req, res, next) {
+//   const auth = req.headers.authorization;
+//   if (!auth) return res.status(401).json({ message: 'No token provided' });
+//   const token = auth.split(' ')[1];
+//   try {
+//     const decoded = jwt.verify(token, SECRET);
+//     req.user = decoded;
+//     next();
+//   } catch {
+//     res.status(401).json({ message: 'Invalid token' });
+//   }
+// }
 
 // POST /user-highlights
 // app.post('/user-highlights', authenticate, (req, res) => {
