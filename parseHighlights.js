@@ -114,12 +114,12 @@ function addUserHighlightInBook(bookname, author, highlight, page, location, tim
 }
 
 function parseHighlights(fileContent) {
+    books.length = 0; // reset the books array
 
     const note_sep = '==========';
-
     console.log('Parsing highlights...');
     rawData = dataToArray(fileContent);
-    console.log("Rawdata[0]:", rawData[0]);
+    // console.log("Rawdata:", rawData);
     if (rawData.length === 0) {
         console.log('No highlights found.');
         return {status: 'error', message: 'No highlights found.', statusCode: 400};

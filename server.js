@@ -136,7 +136,7 @@ app.post('/get-user-highlights-json', upload.single('file'), (req, res) => {
     }
     highlights = parseHighlights.parseHighlights(data); // Call the parsing function
      fs.unlink(filePath, () => {});
-  console.log('Highlights:', highlights);
+  // console.log('Highlights:', highlights);
   return res.json({ message: 'Highlights processed successfully', highlights: highlights });
   });
   
