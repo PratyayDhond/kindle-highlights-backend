@@ -112,6 +112,8 @@ app.post('/user-highlights', upload.single('file'), async (req, res) => {
   });
 });
 
+// #todo
+// update this api call to get, it doesn't need to be a post call
 app.post('/get-user-highlights-json', upload.single('file'), (req, res) => {
   const file = req.file;
   console.log('Inside get-user-highlights-json');

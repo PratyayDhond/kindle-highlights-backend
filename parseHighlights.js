@@ -1,6 +1,5 @@
 const e = require("express");
 const {setBookCount} = require('./progress.js');
-const books = []; // an array of objects
 
 function parseBookNameAndAuthor(bookNameAndAuthor) {
     var bookName = '';
@@ -77,7 +76,7 @@ function parsePageLocationTimestamp(data) {
     return [page, location, timestamp, quoteType];
 }
 
-function bookExists(bookName) {
+function bookExists(books, bookName) {
     for (var i = 0; i < books.length; i++) {
         if (books[i].name === bookName) {
             return books[i];
@@ -86,7 +85,7 @@ function bookExists(bookName) {
     return -1;
 }
 
-function createBook(bookName, author) {
+function createBook(books, bookName, author) {
     var book = {
         name: bookName,
         author: author,
@@ -95,8 +94,8 @@ function createBook(bookName, author) {
     books.push(book);
 }
 
-function addUserHighlightInBook(bookname, author, highlight, page, location, timestamp, type) {
-    highlightObject = {
+function addUserHighlightInBook(books, bookname, author, highlight, page, location, timestamp, type) {
+    const highlightObject = {
         highlight: highlight,
         page: page,
         location: location,
@@ -110,12 +109,10 @@ function addUserHighlightInBook(bookname, author, highlight, page, location, tim
             return;
         }
     }
-
 }
 
 function parseHighlights(fileContent) {
-    books.length = 0; // reset the books array
-
+    const books = [];
     const note_sep = '==========';
     console.log('Parsing highlights...');
     rawData = dataToArray(fileContent);
@@ -166,13 +163,13 @@ function parseHighlights(fileContent) {
 
         // Creating Book if not already exists
         
-        book = bookExists(bookName)
+        book = bookExists(books, bookName)
         if(book === -1){
-            createBook(bookName, author);
-            book = bookExists(bookName); // confirm the book was created and return book object
+            createBook(books, bookName, author);
+            book = bookExists(books, bookName); // confirm the book was created and return book object
         }
 
-        addUserHighlightInBook(bookName, author, currentNote, page, location, timestamp, currentNoteType);
+        addUserHighlightInBook(books, bookName, author, currentNote, page, location, timestamp, currentNoteType);
 
         currentNote = ''
         // Check if the next line is a separator or empty
