@@ -1,5 +1,7 @@
 // File: server.js
 
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -13,9 +15,11 @@ const PORT = process.env.PORT || 3000;
 const parseHighlights = require('./parseHighlights.js'); // Import the highlight parsing function
 const getHighlightsZip = require('./getHighlightsZip.js'); // Import the function to create zip from highlights
 const {setProgress, deleteProgress, getProgress} = require('./progress.js');
+const authRoutes = require('./auth.js');
 
 app.use(cors());
 app.use(bodyParser.json());
+app.use(authRoutes);
 
 const users = {}; // In-memory users store
 const userHighlights = {}; // In-memory highlights store
