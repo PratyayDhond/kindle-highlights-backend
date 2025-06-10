@@ -5,6 +5,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
@@ -18,13 +19,6 @@ const getHighlightsZip = require('./getHighlightsZip.js'); // Import the functio
 const {setProgress, deleteProgress, getProgress} = require('./progress.js');
 const authRoutes = require('./auth.js');
 
-app.use(cors());
-app.use(bodyParser.json());
-app.use(authRoutes);
-
-const users = {}; // In-memory users store
-const userHighlights = {}; // In-memory highlights store
-const upload = multer({ dest: 'uploads/' }); // Uploaded files will go here
 const FRONTEND_URL = 'https://kindle-clippings.dhondpratyay.workers.dev';
 const allowedOrigins = [
   FRONTEND_URL,
@@ -32,6 +26,7 @@ const allowedOrigins = [
   'http://127.0.0.1:8080'
 ];
 
+// CORS middleware should be first!
 app.use(cors({
   origin: function(origin, callback){
     // allow requests with no origin (like mobile apps, curl, etc.)
@@ -40,44 +35,14 @@ app.use(cors({
     } else {
       callback(new Error('Not allowed by CORS'))
     }
-  }
+  }, credentials: true // Allow cookies to be sent
 }));
 
-// // Signup
-// app.post('/signup', async (req, res) => {
-//   res.status(201).json({ message: 'Signup successful' });
-// });
+app.use(bodyParser.json());
+app.use(cookieParser());
+app.use(authRoutes);
 
-// // Login
-// app.post('/login', async (req, res) => {
-//   const { username, password } = req.body;
-//   const user = users[username];
-//   if (!user) return res.status(401).json({ message: 'Invalid credentials' });
-//   const match = await bcrypt.compare(password, user.password);
-//   if (!match) return res.status(401).json({ message: 'Invalid credentials' });
-//   const token = jwt.sign({ username }, SECRET, { expiresIn: '1h' });
-//   res.json({ token });
-// });
-
-// Middleware to verify JWT
-// function authenticate(req, res, next) {
-//   const auth = req.headers.authorization;
-//   if (!auth) return res.status(401).json({ message: 'No token provided' });
-//   const token = auth.split(' ')[1];
-//   try {
-//     const decoded = jwt.verify(token, SECRET);
-//     req.user = decoded;
-//     next();
-//   } catch {
-//     res.status(401).json({ message: 'Invalid token' });
-//   }
-// }
-
-// POST /user-highlights
-// app.post('/user-highlights', authenticate, (req, res) => {
-// enable above post with authentication for deployment  version with login/signup
-
-// write a function to parse the  highlights from the uploaded file
+const upload = multer({ dest: 'uploads/' }); // Uploaded files will go here
 
 
 app.post('/user-highlights', upload.single('file'), async (req, res) => {
@@ -89,9 +54,6 @@ app.post('/user-highlights', upload.single('file'), async (req, res) => {
   if (!file) return res.status(400).json({ message: 'No file uploaded' });
 
   const filePath = path.join(__dirname, file.path);
-  // console.log(file)
-  // console.log('File uploaded:', filePath);
-  // console.log('File name:', file.originalname);
   fs.readFile(filePath, 'utf8', async (err, data) => {
     if (err) {
       console.error('Error reading uploaded file:', err);
@@ -100,25 +62,11 @@ app.post('/user-highlights', upload.single('file'), async (req, res) => {
 
     const highlights = parseHighlights.parseHighlights(data); // Call the parsing function
     fs.unlink(filePath, () => {});
-
-    // Await the zip creation and get the path
-    // const highlightsZipPath = await getHighlightsZip(highlights, jobId);
     await getHighlightsZip(highlights, jobId);
     setProgress(jobId, 100); 
-    // Send the zip file for download
-    // res.download(highlightsZipPath, 'kindle-clippings.zip', (err) => {
-      // if (err) {
-        // console.error('Error sending zip:', err);
-        // res.status(500).json({ message: 'Error sending zip file' });
-      // }
-      // Optionally, delete the zip after sending
-      // fs.unlink(highlightsZipPath, () => {});
-    // });
   });
 });
 
-// #todo
-// update this api call to get, it doesn't need to be a post call
 app.post('/get-user-highlights-json', upload.single('file'), (req, res) => {
   const file = req.file;
   console.log('Inside get-user-highlights-json');

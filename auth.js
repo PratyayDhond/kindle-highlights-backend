@@ -6,10 +6,12 @@ const router = express.Router();
 const User = require('./models/User'); // Assuming you have a User model defined
 const bcrypt = require('bcrypt'); // npm install bcrypt
 const sendWelcomeMail = require('./utils/sendWelcomeMail');
+const jwt = require('jsonwebtoken');
 
 // Replace with your Google Client ID
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'; // Set in .env
 
 router.post('/auth/google', async (req, res) => {
   const { token } = req.body;
@@ -48,6 +50,24 @@ router.post('/auth/google', async (req, res) => {
     if(user && user.googleId === null)
       res.status(400).json({ message: 'Google SSO not enabled for this user', googleId: null });
     else{
+      const token = jwt.sign(
+        { userId: user._id, email: user.email },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // true in production
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
+        sameSite: 'lax'
+      });
+      // why use res.cookie?
+      // To set a cookie in the user's browser with the JWT token for authentication without requiring the user to log in again on subsequent requests.
+      // This allows the server to recognize the user in future requests and maintain their session.
+      // This is particularly useful for Single Sign-On (SSO) scenarios like Google login, where the user is authenticated via Google and the server needs to maintain that session.
+
+
       if(newUser) {
         await sendWelcomeMail({ given_name, email });
         res.status(201).json({ message: 'Google login successful, user created', user, googleId: sub });
@@ -116,6 +136,20 @@ router.post('/auth/login', async (req, res) => {
     if (!match) return res.status(401).json({ message: 'Incorrect password' });
 
     // Generate session/JWT here if needed
+    console.log("User logged in:", user);
+    const token = jwt.sign(
+      { userId: user._id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // true in production
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
+      sameSite: 'lax'
+    });
+
     res.status(200).json({ message: 'Login successful', user });
   } catch (error) {
     console.error('Login error:', error);
@@ -143,6 +177,33 @@ router.post('/auth/verify-email', async (req, res) => {
     console.error('Verification error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
+});
+
+router.post('/auth/logout', (req, res) => {
+  res.clearCookie('token');
+  res.status(200).json({ message: 'Logged out' });
+});
+
+function authenticate(req, res, next) {
+  const token = req.cookies.token;
+  if (!token) return res.status(401).json({ message: 'Not authenticated' });
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ message: 'Invalid or expired token' });
+  }
+}
+
+router.get('/protected', authenticate, (req, res) => {
+  res.json({ message: 'You are authenticated', user: req.user });
+});
+
+router.get('/auth/me', authenticate, (req, res) => {
+  // req.user is set by the authenticate middleware
+  res.status(200).json({ user: req.user });
 });
 
 module.exports = router;
