@@ -14,13 +14,17 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "google-auth-library": "^9.15.1",
     "md-to-pdf": "^5.2.4",
+    "mongodb": "^6.17.0",
+    "mongoose": "^8.15.1",
     "multer": "^2.0.1",
+    "nodemailer": "^7.0.3",
     "uuid": "^11.1.0"
   }
 }

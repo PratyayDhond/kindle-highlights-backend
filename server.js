@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid'); // npm install uuid
+const mongoose = require('mongoose');
 const app = express();
 const PORT = process.env.PORT || 3000;
 // const SECRET = 'supersecret';
@@ -196,6 +197,14 @@ app.get('/progress/:jobId', (req, res) => {
       deleteProgress(jobId);
     }
   }, 500);
+});
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI)
+.then(() => console.log('MongoDB connected!'))
+.catch(err => {
+  console.error('MongoDB connection error:', err);
+  process.exit(1);
 });
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
