@@ -1,21 +1,15 @@
 const express = require('express');
-const nodemailer = require('nodemailer');
+const transporter = require('./mailer'); // or '../mailer' based on location
 const { OAuth2Client } = require('google-auth-library');
 const crypto = require('crypto');
 const router = express.Router();
 const User = require('./models/User'); // Assuming you have a User model defined
 const bcrypt = require('bcrypt'); // npm install bcrypt
+const sendWelcomeMail = require('./utils/sendWelcomeMail');
+
 // Replace with your Google Client ID
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail', // or your email provider
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-});
 
 router.post('/auth/google', async (req, res) => {
   const { token } = req.body;
@@ -31,8 +25,10 @@ router.post('/auth/google', async (req, res) => {
 
     // Extract user info from Google payload
     const { email, given_name, family_name, sub } = payload;
+    console.log("Google user info:", { email, given_name, family_name, sub });
     // Find or create user
     let user = await User.findOne({ email });
+    const newUser = !user;
     if (!user) {
       user = await User.create({
         email,
@@ -43,7 +39,22 @@ router.post('/auth/google', async (req, res) => {
       });
     }
 
-    res.status(200).json({ message: 'Google sign-in successful', googleId: user.googleId });
+    // Code to add option for user to use Google SSO instead of normal signup/login
+    // if(user && user.googleId !== sub) {
+      // user.googleId = sub; // Update Google ID if it has changed
+      // await user.save();
+    // }
+
+    if(user && user.googleId === null)
+      res.status(400).json({ message: 'Google SSO not enabled for this user', googleId: null });
+    else{
+      if(newUser) {
+        await sendWelcomeMail({ given_name, email });
+        res.status(201).json({ message: 'Google login successful, user created', user, googleId: sub });
+      }
+      else
+        res.status(200).json({ message: 'Google login successful', user, googleId: sub });
+    }
   } catch (error) {
     console.error('Google token verification failed:', error);  
     res.status(401).json({ message: 'Invalid Google token', googleId: null });
@@ -56,12 +67,13 @@ router.post('/auth/signup', async (req, res) => {
     return res.status(400).json({ message: 'All fields are required' });
   try {
     let user = await User.findOne({ email });
+    console.log("User found:", user);
     if (user) return res.status(409).json({ message: 'Email already in use' });
 
     const passwordHash = await bcrypt.hash(password, 10);
     const verificationToken = crypto.randomBytes(32).toString('hex');
-  console.log(email, firstName, lastName, password);
-
+    console.log(email, firstName, lastName, password);
+    
     user = await User.create({
       email,
       firstName,
@@ -70,16 +82,18 @@ router.post('/auth/signup', async (req, res) => {
       verified: false,
       verificationToken
     });
-
+    console.log("User created:", user);
     // Send verification email
     const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}&email=${email}`;
+    console.log("Verification URL:", verificationUrl);
+    console.log("Sending verification email to:", email);
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
       subject: 'Verify your email',
       text: `Click this link to verify your email: ${verificationUrl}`,
     });
-
+    console.log("Verification email sent to:", email);
     console.log("Verification link:", verificationUrl);
     res.status(200).json({ message: 'Signup successful, verification email sent' });
   } catch (error) {
@@ -96,8 +110,8 @@ router.post('/auth/login', async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ message: 'Email is not registered' });
-    if (!user.verified) return res.status(403).json({ message: 'Email not verified' });
-
+    if (!user.verified) return res.status(403).json({ message: 'Email is not verified' });
+    if(!user.passwordHash) return res.status(403).json({ message: 'Password is not set for this user' });
     const match = await bcrypt.compare(password, user.passwordHash);
     if (!match) return res.status(401).json({ message: 'Incorrect password' });
 
@@ -120,6 +134,9 @@ router.post('/auth/verify-email', async (req, res) => {
     user.verified = true;
     user.verificationToken = undefined;
     await user.save();
+
+    // Send welcome email after successful verification
+    await sendWelcomeMail({ given_name: user.firstName, email: user.email });
 
     res.status(200).json({ message: 'Email verified successfully' });
   } catch (error) {
