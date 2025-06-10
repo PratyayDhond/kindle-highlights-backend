@@ -1,6 +1,7 @@
 const express = require('express');
 const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
+const crypto = require('crypto');
 const router = express.Router();
 const User = require('./models/User'); // Assuming you have a User model defined
 const bcrypt = require('bcrypt'); // npm install bcrypt
@@ -8,37 +9,17 @@ const bcrypt = require('bcrypt'); // npm install bcrypt
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
-// const uri = process.env.MONGODB_URI;
-
-// // User schema
-// const userSchema = new mongoose.Schema({
-//   email: String,
-//   otp: String,
-//   otpExpires: Date,
-//   // Add other fields as needed
-// });
-// const User = mongoose.model('User', userSchema);
-
-// // Connect to MongoDB (do this in your main server.js in production)
-// mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
-
-// // Utility to generate a 6-digit OTP
-// function generateOTP() {
-//   return Math.floor(100000 + Math.random() * 900000).toString();
-// }
-
-// // Setup nodemailer transporter (use your SMTP credentials)
-// const transporter = nodemailer.createTransport({
-//   service: 'gmail', // or your email provider
-//   auth: {
-//     user: process.env.EMAIL_USER,
-//     pass: process.env.EMAIL_PASS,
-//   },
-// });
+const transporter = nodemailer.createTransport({
+  service: 'gmail', // or your email provider
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD,
+  },
+});
 
 router.post('/auth/google', async (req, res) => {
   const { token } = req.body;
-  if (!token) return res.status(400).json({ message: 'No token provided' });
+  if (!token) return res.status(400).json({ message: 'No token provided', googleId: null });
 
   try {
     const ticket = await googleClient.verifyIdToken({
@@ -46,14 +27,12 @@ router.post('/auth/google', async (req, res) => {
       audience: GOOGLE_CLIENT_ID,
     });
     const payload = ticket.getPayload();
-    if (!payload) return res.status(401).json({ message: 'Invalid Google token' });
+    if (!payload) return res.status(401).json({ message: 'Invalid Google token', googleId: null });
 
     // Extract user info from Google payload
     const { email, given_name, family_name, sub } = payload;
-    console.log(email, given_name, family_name, sub);
     // Find or create user
     let user = await User.findOne({ email });
-    console.log("User found:", user);
     if (!user) {
       user = await User.create({
         email,
@@ -62,47 +41,12 @@ router.post('/auth/google', async (req, res) => {
         googleId: sub,
         verified: true // Google SSO users are considered verified
       });
-      console.log("User created:", user);
     }
 
-    // You may want to generate a session/JWT here for the user
-    res.status(200).json({ message: 'Google sign-in successful', user });
+    res.status(200).json({ message: 'Google sign-in successful', googleId: user.googleId });
   } catch (error) {
-    console.error('Google token verification failed:', error);
-    res.status(401).json({ message: 'Invalid Google token' });
-  }
-});
-
-router.post('/auth/send-otp', async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ message: 'Email is required' });
-
-  try {
-    let user = await User.findOne({ email });
-    if (user) {
-      return res.status(409).json({ message: 'User already exists' });
-    }
-
-    // Generate OTP and expiry (e.g., 10 minutes from now)
-    const otp = generateOTP();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
-
-    // Save user with OTP
-    user = new User({ email, otp, otpExpires });
-    await user.save();
-
-    // Send OTP email
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: 'Your Signup OTP',
-      text: `Your OTP is: ${otp}`,
-    });
-
-    res.status(200).json({ message: 'OTP sent to email' });
-  } catch (error) {
-    console.error('Signup error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error('Google token verification failed:', error);  
+    res.status(401).json({ message: 'Invalid Google token', googleId: null });
   }
 });
 
@@ -110,28 +54,33 @@ router.post('/auth/signup', async (req, res) => {
   const { email, firstName, lastName, password } = req.body;
   if (!email || !firstName || !lastName || !password)
     return res.status(400).json({ message: 'All fields are required' });
-
   try {
     let user = await User.findOne({ email });
-    if (user) {
-      return res.status(409).json({ message: 'Email already in use' });
-    }
+    if (user) return res.status(409).json({ message: 'Email already in use' });
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+  console.log(email, firstName, lastName, password);
 
-    // Create user as unverified
     user = await User.create({
       email,
       firstName,
       lastName,
       passwordHash,
-      verified: false
+      verified: false,
+      verificationToken
     });
 
-    // Send verification email with a link or OTP (implement separately)
-    
-    // await sendVerificationEmail(user);
+    // Send verification email
+    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}&email=${email}`;
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Verify your email',
+      text: `Click this link to verify your email: ${verificationUrl}`,
+    });
 
+    console.log("Verification link:", verificationUrl);
     res.status(200).json({ message: 'Signup successful, verification email sent' });
   } catch (error) {
     console.error('Signup error:', error);
@@ -146,11 +95,11 @@ router.post('/auth/login', async (req, res) => {
 
   try {
     const user = await User.findOne({ email });
-    if (!user) return res.status(401).json({ message: 'email is not registered with us' });
+    if (!user) return res.status(401).json({ message: 'Email is not registered' });
     if (!user.verified) return res.status(403).json({ message: 'Email not verified' });
 
     const match = await bcrypt.compare(password, user.passwordHash);
-    if (!match) return res.status(401).json({ message: 'Incorrect Password' });
+    if (!match) return res.status(401).json({ message: 'Incorrect password' });
 
     // Generate session/JWT here if needed
     res.status(200).json({ message: 'Login successful', user });
@@ -160,4 +109,30 @@ router.post('/auth/login', async (req, res) => {
   }
 });
 
+router.post('/auth/verify-email', async (req, res) => {
+  const { token, email } = req.body;
+  if (!token || !email) return res.status(400).json({ message: 'Invalid link' });
+  console.log("Verification token:", token, "Email:", email);
+  try {
+    const user = await User.findOne({ email, verificationToken: token });
+    if (!user) return res.status(400).json({ message: 'Invalid or expired token' });
+
+    user.verified = true;
+    user.verificationToken = undefined;
+    await user.save();
+
+    res.status(200).json({ message: 'Email verified successfully' });
+  } catch (error) {
+    console.error('Verification error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 module.exports = router;
+
+
+
+
+
+// #todo
+// check why it is taking frontend url for the verification email link since we can directly use the backend url.

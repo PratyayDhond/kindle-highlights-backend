@@ -8,7 +8,8 @@ const userSchema = new mongoose.Schema({
   passwordHash: { type: String, default: null }, // For email/password users
   verified: { type: Boolean, default: false }, // Email verified
   createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+  updatedAt: { type: Date, default: Date.now },
+  verificationToken: { type: String, default: undefined } // undefined as undefined tokens are ignored during javascript serialisation
 });
 
 module.exports = mongoose.model('User', userSchema);
