@@ -13,6 +13,17 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'; // Set in .env
 
+// currently only supports gmail.com emails
+// Add support for other email providers
+const cleanEmail = (email) => {
+  const [username, domain] = email.split("@");
+  if (domain && domain.toLowerCase() === "gmail.com") {
+    const cleanedUsername = username.split("+")[0].replace(/\./g, "");
+    return `${cleanedUsername}@${domain}`;
+  }
+  return email;
+};
+
 router.post('/auth/google', async (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ message: 'No token provided', googleId: null });
@@ -27,13 +38,17 @@ router.post('/auth/google', async (req, res) => {
 
     // Extract user info from Google payload
     const { email, given_name, family_name, sub } = payload;
+    const cleanedEmail = cleanEmail(email);
+    if (!cleanedEmail) return res.status(400).json({ message: 'Invalid email', googleId: null });
+
     console.log("Google user info:", { email, given_name, family_name, sub });
+    console.log("Cleaned email:", cleanedEmail);
     // Find or create user
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ email: cleanedEmail });
     const newUser = !user;
     if (!user) {
       user = await User.create({
-        email,
+        email: cleanedEmail,
         firstName: given_name,
         lastName: family_name,
         googleId: sub,
@@ -69,7 +84,7 @@ router.post('/auth/google', async (req, res) => {
 
 
       if(newUser) {
-        await sendWelcomeMail({ given_name, email });
+        await sendWelcomeMail({ given_name, email: cleanedEmail });
         res.status(201).json({ message: 'Google login successful, user created', user, googleId: sub });
       }
       else
@@ -85,8 +100,10 @@ router.post('/auth/signup', async (req, res) => {
   const { email, firstName, lastName, password } = req.body;
   if (!email || !firstName || !lastName || !password)
     return res.status(400).json({ message: 'All fields are required' });
+  let cleanedEmail = cleanEmail(email);
+  if (!cleanedEmail) return res.status(400).json({ message: 'Invalid email' });
   try {
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ email: cleanedEmail });
     console.log("User found:", user);
     if (user) return res.status(409).json({ message: 'Email already in use' });
 
@@ -95,7 +112,7 @@ router.post('/auth/signup', async (req, res) => {
     console.log(email, firstName, lastName, password);
     
     user = await User.create({
-      email,
+      email: cleanedEmail,
       firstName,
       lastName,
       passwordHash,
@@ -104,16 +121,16 @@ router.post('/auth/signup', async (req, res) => {
     });
     console.log("User created:", user);
     // Send verification email
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}&email=${email}`;
+    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}&email=${cleanedEmail}`;
     console.log("Verification URL:", verificationUrl);
-    console.log("Sending verification email to:", email);
+    console.log("Sending verification email to:", cleanedEmail);
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
-      to: email,
+      to: cleanedEmail,
       subject: 'Verify your email',
       text: `Click this link to verify your email: ${verificationUrl}`,
     });
-    console.log("Verification email sent to:", email);
+    console.log("Verification email sent to:", cleanedEmail);
     console.log("Verification link:", verificationUrl);
     res.status(200).json({ message: 'Signup successful, verification email sent' });
   } catch (error) {
@@ -126,9 +143,11 @@ router.post('/auth/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password)
     return res.status(400).json({ message: 'Email and password are required' });
-
+  let cleanedEmail = cleanEmail(email);
+  if (!cleanedEmail) return res.status(400).json({ message: 'Invalid email' });
+  console.log("Login attempt for email:", cleanedEmail);
   try {
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: cleanedEmail });
     if (!user) return res.status(401).json({ message: 'Email is not registered' });
     if (!user.verified) return res.status(403).json({ message: 'Email is not verified' });
     if(!user.passwordHash) return res.status(403).json({ message: 'Password is not set for this user' });
