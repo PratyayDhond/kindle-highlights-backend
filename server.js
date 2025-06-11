@@ -69,13 +69,13 @@ app.post('/user-highlights', upload.single('file'), async (req, res) => {
 
 app.post('/get-user-highlights-json', upload.single('file'), (req, res) => {
   const file = req.file;
-  console.log('Inside get-user-highlights-json');
-  console.log('File:', file);
-  console.log('File path:', file.path);
-  console.log('File originalname:', file.originalname);
+   console.log('Inside get-user-highlights-json');
+   console.log('File:', file);
+   console.log('File path:', file.path);
+   console.log('File originalname:', file.originalname);
   if (!file) return res.status(400).json({ message: 'No file uploaded' });
   const filePath = path.join(__dirname, file.path);
-  console.log('File uploaded:', filePath);
+   console.log('File uploaded:', filePath);
   var highlights = []
   fs.readFile(filePath, 'utf8', (err, data) => {
     if (err) {
@@ -84,7 +84,7 @@ app.post('/get-user-highlights-json', upload.single('file'), (req, res) => {
     }
     highlights = parseHighlights.parseHighlights(data); // Call the parsing function
      fs.unlink(filePath, () => {});
-  // console.log('Highlights:', highlights);
+  //  console.log('Highlights:', highlights);
   return res.json({ message: 'Highlights processed successfully', highlights: highlights });
   });
   
@@ -93,10 +93,10 @@ app.post('/get-user-highlights-json', upload.single('file'), (req, res) => {
 app.get('/download-highlights/:jobId', (req, res) => {
   const jobId = req.params.jobId;
   const highlightsZipPath = `./${jobId}.zip`; // Assuming the zip is named with jobId
-  console.log("Inside download-highlights");
-  console.log("Highlights zip path:", highlightsZipPath);
+   console.log("Inside download-highlights");
+   console.log("Highlights zip path:", highlightsZipPath);
   if (fs.existsSync(highlightsZipPath)) {
-    console.log("Inside if condition of download-highlights");
+     console.log("Inside if condition of download-highlights");
     res.download(highlightsZipPath, `${jobId}.zip`, (err) => {
       if (err) {
         console.error('Error sending zip:', err);
@@ -115,7 +115,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/health-check', (req,res) => {
-  console.log('Health check endpoint hit from', req.ip);
+   console.log('Health check endpoint hit from', req.ip);
   res.status(200).json({ status: 'alive', isHealthy: true });
 });
 
@@ -149,13 +149,13 @@ app.get('/progress/:jobId', (req, res) => {
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
-.then(() => console.log('MongoDB connected!'))
+.then(() =>  console.log('MongoDB connected!'))
 .catch(err => {
   console.error('MongoDB connection error:', err);
   process.exit(1);
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () =>  console.log(`Server running on port ${PORT}`));
 
-// #todo 
+// #todo
 // check for missing dependencies and add them to package.json

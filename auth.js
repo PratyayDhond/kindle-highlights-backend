@@ -41,8 +41,8 @@ router.post('/auth/google', async (req, res) => {
     const cleanedEmail = cleanEmail(email);
     if (!cleanedEmail) return res.status(400).json({ message: 'Invalid email', googleId: null });
 
-    console.log("Google user info:", { email, given_name, family_name, sub });
-    console.log("Cleaned email:", cleanedEmail);
+     console.log("Google user info:", { email, given_name, family_name, sub });
+     console.log("Cleaned email:", cleanedEmail);
     // Find or create user
     let user = await User.findOne({ email: cleanedEmail });
     const newUser = !user;
@@ -104,12 +104,12 @@ router.post('/auth/signup', async (req, res) => {
   if (!cleanedEmail) return res.status(400).json({ message: 'Invalid email' });
   try {
     let user = await User.findOne({ email: cleanedEmail });
-    console.log("User found:", user);
+     console.log("User found:", user);
     if (user) return res.status(409).json({ message: 'Email already in use' });
 
     const passwordHash = await bcrypt.hash(password, 10);
     const verificationToken = crypto.randomBytes(32).toString('hex');
-    console.log(email, firstName, lastName, password);
+     console.log(email, firstName, lastName, password);
     
     user = await User.create({
       email: cleanedEmail,
@@ -119,19 +119,19 @@ router.post('/auth/signup', async (req, res) => {
       verified: false,
       verificationToken
     });
-    console.log("User created:", user);
+     console.log("User created:", user);
     // Send verification email
     const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}&email=${cleanedEmail}`;
-    console.log("Verification URL:", verificationUrl);
-    console.log("Sending verification email to:", cleanedEmail);
+     console.log("Verification URL:", verificationUrl);
+     console.log("Sending verification email to:", cleanedEmail);
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: cleanedEmail,
       subject: 'Verify your email',
       text: `Click this link to verify your email: ${verificationUrl}`,
     });
-    console.log("Verification email sent to:", cleanedEmail);
-    console.log("Verification link:", verificationUrl);
+     console.log("Verification email sent to:", cleanedEmail);
+     console.log("Verification link:", verificationUrl);
     res.status(200).json({ message: 'Signup successful, verification email sent' });
   } catch (error) {
     console.error('Signup error:', error);
@@ -145,7 +145,7 @@ router.post('/auth/login', async (req, res) => {
     return res.status(400).json({ message: 'Email and password are required' });
   let cleanedEmail = cleanEmail(email);
   if (!cleanedEmail) return res.status(400).json({ message: 'Invalid email' });
-  console.log("Login attempt for email:", cleanedEmail);
+   console.log("Login attempt for email:", cleanedEmail);
   try {
     const user = await User.findOne({ email: cleanedEmail });
     if (!user) return res.status(401).json({ message: 'Email is not registered' });
@@ -155,7 +155,7 @@ router.post('/auth/login', async (req, res) => {
     if (!match) return res.status(401).json({ message: 'Incorrect password' });
 
     // Generate session/JWT here if needed
-    console.log("User logged in:", user);
+     console.log("User logged in:", user);
     const token = jwt.sign(
       { userId: user._id, email: user.email },
       JWT_SECRET,
@@ -179,7 +179,7 @@ router.post('/auth/login', async (req, res) => {
 router.post('/auth/verify-email', async (req, res) => {
   const { token, email } = req.body;
   if (!token || !email) return res.status(400).json({ message: 'Invalid link' });
-  console.log("Verification token:", token, "Email:", email);
+   console.log("Verification token:", token, "Email:", email);
   try {
     const user = await User.findOne({ email, verificationToken: token });
     if (!user) return res.status(400).json({ message: 'Invalid or expired token' });

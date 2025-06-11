@@ -11,7 +11,7 @@ function parseBookNameAndAuthor(bookNameAndAuthor) {
             j--;
         }
         if( j < 0) {
-            console.log('Error: No opening parenthesis found in book name and author.');
+             console.log('Error: No opening parenthesis found in book name and author.');
             return {status: 'error', message: 'No opening parenthesis found in book name and author.', statusCode: 400, bookName: bookNameAndAuthor, author: ''};   
         }
         bookName = bookNameAndAuthor.substring(0, j).trim();
@@ -114,11 +114,10 @@ function addUserHighlightInBook(books, bookname, author, highlight, page, locati
 function parseHighlights(fileContent) {
     const books = [];
     const note_sep = '==========';
-    console.log('Parsing highlights...');
+     console.log('Parsing highlights...');
     rawData = dataToArray(fileContent);
-    // console.log("Rawdata:", rawData);
     if (rawData.length === 0) {
-        console.log('No highlights found.');
+         console.log('No highlights found.');
         return {status: 'error', message: 'No highlights found.', statusCode: 400};
     }
 
@@ -150,12 +149,11 @@ function parseHighlights(fileContent) {
         [page, location, timestamp, currentNoteType] = parsePageLocationTimestamp(dataLine2);
 
         i+= 1; // skip the next line which is a separator
-        // console.log("Current Line:", rawData[i]);
+        //  console.log("Current Line:", rawData[i]);
         while( i < rawData.length && rawData[i].trim() !== note_sep){
             currentNote += rawData[i].trim() + '\n';
             i++;
         }
-        // console.log("Current Note:", currentNote);   
         // remove the last newline character    
         if (currentNote.length > 0 && currentNote[currentNote.length - 1] === '\n') {
             currentNote = currentNote.slice(0, -1);
@@ -178,7 +176,7 @@ function parseHighlights(fileContent) {
         }
     }
     setBookCount(books.length);
-    console.log('Parsing completed. Total books:', books.length);
+     console.log('Parsing completed. Total books:', books.length);
     return books;
 }
 
