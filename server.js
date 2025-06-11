@@ -30,7 +30,7 @@ const allowedOrigins = [
 // CORS middleware should be first!
 app.use(cors({
   origin: function(origin, callback){
-    console.log('CORS request from origin:', origin);
+    // console.log('CORS request from origin:', origin);
     // allow requests with no origin (like mobile apps, curl, etc.)
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true)

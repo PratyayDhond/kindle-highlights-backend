@@ -73,9 +73,9 @@ router.post('/auth/google', async (req, res) => {
 
       res.cookie('token', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // true in production
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
-        sameSite: 'lax'
+        secure: true,           // Must be true for SameSite: 'none'
+        sameSite: 'none',       // Allow cross-site cookies
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       });
       // why use res.cookie?
       // To set a cookie in the user's browser with the JWT token for authentication without requiring the user to log in again on subsequent requests.
@@ -164,9 +164,9 @@ router.post('/auth/login', async (req, res) => {
 
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // true in production
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
-      sameSite: 'lax'
+      secure: true,           // Must be true for SameSite: 'none'
+      sameSite: 'none',       // Allow cross-site cookies
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
     res.status(200).json({ message: 'Login successful', user });
