@@ -23,6 +23,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL; // Default to localhost if not se
 console.log('Frontend URL:', FRONTEND_URL);
 const allowedOrigins = [
   FRONTEND_URL,
+  'https://kindle-clippings.pages.dev/',
   'http://localhost:8080',
   'http://127.0.0.1:8080'
 ];
@@ -30,13 +31,15 @@ const allowedOrigins = [
 // CORS middleware should be first!
 app.use(cors({
   origin: function(origin, callback){
+    console.log('CORS request from origin:', origin);
     // allow requests with no origin (like mobile apps, curl, etc.)
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true)
     } else {
       callback(new Error('Not allowed by CORS'))
     }
-  }, credentials: true // Allow cookies to be sent
+  },
+  credentials: true // Allow cookies to be sent
 }));
 
 app.use(bodyParser.json());
