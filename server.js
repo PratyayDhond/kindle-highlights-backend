@@ -19,7 +19,7 @@ const getHighlightsZip = require('./getHighlightsZip.js'); // Import the functio
 const {setProgress, deleteProgress, getProgress} = require('./progress.js');
 const authRoutes = require('./auth.js');
 
-const FRONTEND_URL = 'https://kindle-clippings.dhondpratyay.workers.dev';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:8080'; // Default to localhost if not set
 const allowedOrigins = [
   FRONTEND_URL,
   'http://localhost:8080',
