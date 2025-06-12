@@ -162,3 +162,7 @@ app.listen(PORT, () =>  console.log(`Server running on port ${PORT}`));
 
 // #todo
 // check for missing dependencies and add them to package.json
+
+// #todo
+// add coins to User model and add a route to get coins for a user
+// add coins consumption for highlight processing

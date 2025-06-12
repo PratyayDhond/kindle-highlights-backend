@@ -8,6 +8,7 @@ const bcrypt = require('bcrypt'); // npm install bcrypt
 const sendWelcomeMail = require('./utils/sendWelcomeMail');
 const jwt = require('jsonwebtoken');
 
+
 // Replace with your Google Client ID
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
@@ -51,6 +52,7 @@ router.post('/auth/google', async (req, res) => {
         email: cleanedEmail,
         firstName: given_name,
         lastName: family_name,
+        coins: process.env.FREE_SIGNUP_COINS, // Initial coins for new verified users
         googleId: sub,
         verified: true // Google SSO users are considered verified
       });
@@ -117,7 +119,8 @@ router.post('/auth/signup', async (req, res) => {
       lastName,
       passwordHash,
       verified: false,
-      verificationToken
+      verificationToken,
+      coins: 0
     });
      console.log("User created:", user);
     // Send verification email
@@ -186,6 +189,9 @@ router.post('/auth/verify-email', async (req, res) => {
 
     user.verified = true;
     user.verificationToken = undefined;
+    user.coins = process.env.FREE_SIGNUP_COINS; // Set initial coins for verified users
+    user.updatedAt = new Date(); // Update the timestamp
+    //  console.log("User verified:", user);
     await user.save();
 
     // Send welcome email after successful verification

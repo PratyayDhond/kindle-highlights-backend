@@ -5,6 +5,7 @@ const userSchema = new mongoose.Schema({
   firstName: String,
   lastName: String,
   googleId: { type: String, default: null }, // For Google SSO users
+  coins: {type: Number, default: 0}, // User's coin balance
   passwordHash: { type: String, default: null }, // For email/password users
   verified: { type: Boolean, default: false }, // Email verified
   createdAt: { type: Date, default: Date.now },
