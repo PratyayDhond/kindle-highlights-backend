@@ -7,7 +7,7 @@ I'm Pratyay, the developer of Kindle Clippings — a project born from my own st
 
 Thanks for signing up! I hope the service makes your reading life easier.
 
-As an early user, you’ve received 500 free Coins — our in-app currency to unlock premium features like exporting and organizing.
+As an early user, you’ve received ${process.env.FREE_SIGNUP_COINS} free Coins — our in-app currency to unlock premium features like exporting and organizing.
 
 If you have any questions, suggestions, or spot any bugs, feel free to reach out at ${process.env.EMAIL_USER}.
 

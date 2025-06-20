@@ -29,7 +29,7 @@ A Node.js + Express backend service that allows users to:
 
 ## Version
 
-**Current Version:** 1.1.0
+**Current Version:** 1.2.0
 
 ## Changelog
 
@@ -44,3 +44,8 @@ A Node.js + Express backend service that allows users to:
 - Coin system for users
 - File upload and highlight processing with coin deduction
 - `/version` API to get backend version
+
+### 1.2.0
+
+- Fixed Static Free Signup coins (500 coins) being sent in welcome mail. Now fetching dynamic value from environment variable.
+- Added Redundant Highlights removal via overlapping sub-intervals solution.

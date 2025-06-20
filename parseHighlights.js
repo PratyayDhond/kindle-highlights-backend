@@ -191,14 +191,14 @@ function dataToArray(data) {
 }
 
 // a function to return similarity scores between two texts
-function getSimilarityScore(text1, text2){
-    const set1 = new Set(text1.toLowerCase().split(/\s+/));
-    const set2 = new Set(text2.toLowerCase().split(/\s+/));
-    const intersection = new Set([...set1].filter(x => set2.has(x)));
-    const union = new Set([...set1, ...set2]);
-    if (union.size === 0) return 0;
-    return intersection.size / union.size;
-}
+// function getSimilarityScore(text1, text2){
+//     const set1 = new Set(text1.toLowerCase().split(/\s+/));
+//     const set2 = new Set(text2.toLowerCase().split(/\s+/));
+//     const intersection = new Set([...set1].filter(x => set2.has(x)));
+//     const union = new Set([...set1, ...set2]);
+//     if (union.size === 0) return 0;
+//     return intersection.size / union.size;
+// }
 
 
 function parseLocation(location) {
