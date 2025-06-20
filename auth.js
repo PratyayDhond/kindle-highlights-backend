@@ -7,6 +7,7 @@ const User = require('./models/User'); // Assuming you have a User model defined
 const bcrypt = require('bcrypt'); // npm install bcrypt
 const sendWelcomeMail = require('./utils/sendWelcomeMail');
 const jwt = require('jsonwebtoken');
+const { setMaxIdleHTTPParsers } = require('http');
 
 
 // Replace with your Google Client ID
@@ -87,10 +88,20 @@ router.post('/auth/google', async (req, res) => {
 
       if(newUser) {
         await sendWelcomeMail({ given_name, email: cleanedEmail });
-        res.status(201).json({ message: 'Google login successful, user created', user, googleId: sub });
+        res.status(201).json({ 
+          message: 'Google login successful, user created', 
+          user, 
+          googleId: sub,
+          coins: user.coins // or user.coins if that's your field
+        });
+      } else {
+        res.status(200).json({ 
+          message: 'Google login successful', 
+          user, 
+          googleId: sub,
+          coins: user.coins // or user.coins
+        });
       }
-      else
-        res.status(200).json({ message: 'Google login successful', user, googleId: sub });
     }
   } catch (error) {
     console.error('Google token verification failed:', error);  
@@ -172,7 +183,11 @@ router.post('/auth/login', async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
-    res.status(200).json({ message: 'Login successful', user });
+    res.status(200).json({ 
+      message: 'Login successful', 
+      user,
+      coins: user.coins // or user.coins
+    });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -231,7 +246,10 @@ router.get('/auth/me', authenticate, (req, res) => {
   res.status(200).json({ user: req.user });
 });
 
-module.exports = router;
+module.exports = {
+  router,
+  authenticate
+};
 
 
 

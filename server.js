@@ -17,10 +17,10 @@ const PORT = process.env.PORT || 3000;
 const parseHighlights = require('./parseHighlights.js'); // Import the highlight parsing function
 const getHighlightsZip = require('./getHighlightsZip.js'); // Import the function to create zip from highlights
 const {setProgress, deleteProgress, getProgress} = require('./progress.js');
-const authRoutes = require('./auth.js');
+const { router: authRoutes, authenticate } = require('./auth.js');
+const User = require('./models/User'); // Adjust path as needed
 
-const FRONTEND_URL = 'https://kindle-clippings.pages.dev'; // Default to localhost if not set
-console.log('Frontend URL:', FRONTEND_URL);
+const FRONTEND_URL = process.env.FRONTEND_URL; // Default to localhost if not set
 const allowedOrigins = [
   FRONTEND_URL,
   'http://localhost:8080',
@@ -30,7 +30,6 @@ const allowedOrigins = [
 // CORS middleware should be first!
 app.use(cors({
   origin: function(origin, callback){
-    // console.log('CORS request from origin:', origin);
     // allow requests with no origin (like mobile apps, curl, etc.)
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true)
@@ -47,30 +46,13 @@ app.use(authRoutes);
 
 const upload = multer({ dest: 'uploads/' }); // Uploaded files will go here
 
+const PROCESSING_FEE_PER_BOOK = process.env.PROCESSING_FEE_PER_BOOK; // Set your fee
 
-app.post('/user-highlights', upload.single('file'), async (req, res) => {
-  const jobId = uuidv4();
-  setProgress(jobId, 0); // Initialize progress for this job
-  res.json({ jobId }); // Immediately respond with jobId
+app.post('/get-user-highlights-json', authenticate, upload.single('file'), async (req, res) => {
+  const userId = req.user.userId;
+  const user = await User.findById(userId);
+  if (!user) return res.status(401).json({ message: 'User not found' });
 
-  const file = req.file;
-  if (!file) return res.status(400).json({ message: 'No file uploaded' });
-
-  const filePath = path.join(__dirname, file.path);
-  fs.readFile(filePath, 'utf8', async (err, data) => {
-    if (err) {
-      console.error('Error reading uploaded file:', err);
-      return res.status(500).json({ message: 'Error reading file' });
-    }
-
-    const highlights = parseHighlights.parseHighlights(data); // Call the parsing function
-    fs.unlink(filePath, () => {});
-    await getHighlightsZip(highlights, jobId);
-    setProgress(jobId, 100); 
-  });
-});
-
-app.post('/get-user-highlights-json', upload.single('file'), (req, res) => {
   const file = req.file;
    console.log('Inside get-user-highlights-json');
    console.log('File:', file);
@@ -78,39 +60,33 @@ app.post('/get-user-highlights-json', upload.single('file'), (req, res) => {
    console.log('File originalname:', file.originalname);
   if (!file) return res.status(400).json({ message: 'No file uploaded' });
   const filePath = path.join(__dirname, file.path);
-   console.log('File uploaded:', filePath);
-  var highlights = []
-  fs.readFile(filePath, 'utf8', (err, data) => {
+
+  fs.readFile(filePath, 'utf8', async (err, data) => {
+    // Always delete the uploaded file
+    fs.unlink(filePath, () => {});
+
     if (err) {
-      console.error('Error reading uploaded file:', err);
       return res.status(500).json({ message: 'Error reading file' });
     }
-    highlights = parseHighlights.parseHighlights(data); // Call the parsing function
-     fs.unlink(filePath, () => {});
-  //  console.log('Highlights:', highlights);
-  return res.json({ message: 'Highlights processed successfully', highlights: highlights });
-  });
-  
-});
 
-app.get('/download-highlights/:jobId', (req, res) => {
-  const jobId = req.params.jobId;
-  const highlightsZipPath = `./${jobId}.zip`; // Assuming the zip is named with jobId
-   console.log("Inside download-highlights");
-   console.log("Highlights zip path:", highlightsZipPath);
-  if (fs.existsSync(highlightsZipPath)) {
-     console.log("Inside if condition of download-highlights");
-    res.download(highlightsZipPath, `${jobId}.zip`, (err) => {
-      if (err) {
-        console.error('Error sending zip:', err);
-        res.status(500).json({ message: 'Error sending zip file' });
-      }
-      // Optionally, delete the zip after sending
-      fs.unlink(highlightsZipPath, () => {});
+    const highlights = parseHighlights.parseHighlights(data);
+    console.log(highlights);
+    console.log(highlights.length, 'highlights found');
+    const uniqueBooks = highlights.length;
+    const totalFee = uniqueBooks * PROCESSING_FEE_PER_BOOK;
+    console.log("Total fee for processing:", totalFee, "for", uniqueBooks, "books");
+    if (user.coins < totalFee) {
+      return res.status(402).json({ message: `Not enough coins. You need ${totalFee} coins for ${uniqueBooks} books.` });
+    }
+
+    user.coins -= totalFee;
+    await user.save();
+    return res.json({ 
+      message: `Highlights processed successfully. Charged ${totalFee} coins for ${uniqueBooks} books.`,
+      highlights,
+      coins: user.coins
     });
-  } else {
-    res.status(404).json({ message: 'Highlights not found' });
-  }
+  });
 });
 
 app.get('/', (req, res) => {
@@ -122,32 +98,16 @@ app.get('/health-check', (req,res) => {
   res.status(200).json({ status: 'alive', isHealthy: true });
 });
 
-// Progress endpoint
-app.get('/progress/:jobId', (req, res) => {
-  const allowedOrigins = [
-    FRONTEND_URL,
-    'http://localhost:8080',
-    'http://127.0.0.1:8080'
-  ];
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  // res.setHeader('Access-Control-Allow-Credentials', 'true'); // Uncomment if needed
+app.get('/coins', authenticate, async (req, res) => {
+  const userId = req.user.userId;
+  const user = await User.findById(userId);
+  console.log('Call to /coins endpoint by user:', userId);
+  if (!user) return res.status(401).json({ message: 'User not found' });
+  res.json({ coins: user.coins });
+});
 
-  const jobId = req.params.jobId;
-  const interval = setInterval(() => {
-    const progress = getProgress(jobId);
-    res.write(`data: ${progress}\n\n`);
-    if (progress >= 100) {
-      clearInterval(interval);
-      res.end();
-      deleteProgress(jobId);
-    }
-  }, 500);
+app.get('/version', (req, res) => {
+  res.json({ version: process.env.VERSION || 'unknown' });
 });
 
 // Connect to MongoDB
@@ -166,3 +126,4 @@ app.listen(PORT, () =>  console.log(`Server running on port ${PORT}`));
 // #todo
 // add coins to User model and add a route to get coins for a user
 // add coins consumption for highlight processing
+// coins are a currency for features

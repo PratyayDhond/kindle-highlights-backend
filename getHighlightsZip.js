@@ -3,23 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const { mdToPdf } = require('md-to-pdf');
 const {setProgress, getBookCount, getProgress} = require('./progress.js');
-// const pLimit = require('p-limit');
-// const limit = pLimit(3); // Try 2 or 3, adjust as needed
-
-// function runPdfWorker(content, dest) {
-//     return new Promise((resolve, reject) => {
-//         const worker = new Worker(path.join(__dirname, 'pdfWorker.js'));
-//         worker.postMessage({ content, dest });
-//         worker.on('message', (msg) => {
-//             if (msg.success) resolve(msg.dest);
-//             else reject(new Error(msg.error));
-//         });
-//         worker.on('error', reject);
-//         worker.on('exit', (code) => {
-//             if (code !== 0) reject(new Error(`Worker stopped with exit code ${code}`));
-//         });
-//     });
-// }
 
 function createMarkdownFiles(highlights, jobId) {
     console.timeLog('getHighlightsZip', 'Started createMarkdownFiles');
