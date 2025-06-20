@@ -95,12 +95,16 @@ function createBook(books, bookName, author) {
 }
 
 function addUserHighlightInBook(books, bookname, author, highlight, page, location, timestamp, type) {
+    let locObj = parseLocation(location);
+    
     const highlightObject = {
         highlight: highlight,
         page: page,
         location: location,
         timestamp: timestamp,
-        type: type
+        type: type,
+        locStart: locObj.start,
+        locEnd: locObj.end
     };
 
     for (var i = 0; i < books.length; i++) {
@@ -113,6 +117,7 @@ function addUserHighlightInBook(books, bookname, author, highlight, page, locati
 
 function parseHighlights(fileContent) {
     const books = [];
+    let totalHighlights = 0;
     const note_sep = '==========';
      console.log('Parsing highlights...');
     rawData = dataToArray(fileContent);
@@ -168,7 +173,7 @@ function parseHighlights(fileContent) {
         }
 
         addUserHighlightInBook(books, bookName, author, currentNote, page, location, timestamp, currentNoteType);
-
+        totalHighlights++;
         currentNote = ''
         // Check if the next line is a separator or empty
         while(i < rawData.length && (rawData[i].trimRight() === '' || rawData[i].trimRight() === note_sep)) {
@@ -177,12 +182,103 @@ function parseHighlights(fileContent) {
     }
     setBookCount(books.length);
      console.log('Parsing completed. Total books:', books.length);
-    return books;
+     console.log('Total highlights:', totalHighlights);
+    return removeRedundantHighlights(books);
 }
 
 function dataToArray(data) {
   return data.split('\n').map(line => line.trim()).filter(line => line.length > 0);
 }
 
+// a function to return similarity scores between two texts
+function getSimilarityScore(text1, text2){
+    const set1 = new Set(text1.toLowerCase().split(/\s+/));
+    const set2 = new Set(text2.toLowerCase().split(/\s+/));
+    const intersection = new Set([...set1].filter(x => set2.has(x)));
+    const union = new Set([...set1, ...set2]);
+    if (union.size === 0) return 0;
+    return intersection.size / union.size;
+}
+
+
+function parseLocation(location) {
+    if (!location) return { start: 0, end: 0 };
+    if (typeof location === 'number') return { start: location, end: location };
+    const parts = location.split('-').map(x => parseInt(x.trim(), 10));
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        return { start: parts[0], end: parts[1] };
+    }
+    if (parts.length === 1 && !isNaN(parts[0])) {
+        return { start: parts[0], end: parts[0] };
+    }
+    return { start: 0, end: 0 };
+}
+
+function purgeOverlappingHighlights(highlights) {
+    if (!highlights.length) return [];
+    const solution = [];
+
+    // sort highlights by locStart here
+    highlights.sort((a, b) => a.locStart - b.locStart);
+
+    let current = highlights[0];
+    for (let i = 1; i < highlights.length; i++) {
+        const next = highlights[i];
+        if (current.locEnd >= next.locStart) {
+            // Overlapping or touching intervals, keep the latest one out of the two
+            let currentTime = new Date(current.timestamp).getTime();
+            let nextTime = new Date(next.timestamp).getTime();
+            if (nextTime > currentTime) {
+                // If next highlight is more recent, update current and forget about it ;)
+                current = next
+            }
+            // current.locEnd = Math.max(current.locEnd, next.locEnd);
+        } else {
+            // No overlap, push the current highlight and move to the next
+            solution.push(current);
+            current = next;
+        }
+    }
+    return solution;
+}
+
+function removeRedundantHighlights(books){
+    let totalHighlights = 0;
+    books.forEach(book => {
+        // let highlights = book.highlights;
+        // Sort highlights by the start of their location (handles both "824" and "824-835")
+        // highlights.sort((a, b) => a.locStart - b.locStart);
+        book.highlights = purgeOverlappingHighlights(book.highlights);
+        totalHighlights += book.highlights.length;
+
+        // for(let i = 0; i < highlights.length; i++){
+            // console.log(`location: ${highlights[i].location}, locStart: ${highlights[i].locStart}, locEnd: ${highlights[i].locEnd}`);            
+            // for(let j = i+1; j < highlights.length; j++){
+
+
+                // let simScore = getSimilarityScore(highlights[i].highlight, highlights[j].highlight);
+                // // console.log(`Similarity Score for pair ${i},${j} is ${simScore}`)
+                // let locDiff = Math.abs(highlights[i].location - highlights[j].location);
+                // let pageDiff = Math.abs(highlights[i].page - highlights[j].page);
+                // if(simScore > 0.25 && simScore < 0.40 && (locDiff <= 4 || pageDiff < 1)){
+                //     console.log(highlights[i].highlight)
+                //     console.log(highlights[j].highlight)
+                //     console.log(simScore)
+                //     console.log(".")
+                // }
+
+                // what if we instead cross check the loc on which the highlight was made.
+                // If the highlights have overlapping loc we keep the latest one
+
+                // now compare the i with j and see if they overlap, if they overlap keep the current one and remove the past one from highlights.
+
+
+
+            // }
+        // }
+    });
+    console.log(`Total highlights after removing redundant ones: ${totalHighlights}`);
+    return books;
+}
 
 module.exports = {parseHighlights}

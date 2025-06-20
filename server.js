@@ -70,7 +70,7 @@ app.post('/get-user-highlights-json', authenticate, upload.single('file'), async
     }
 
     const highlights = parseHighlights.parseHighlights(data);
-    console.log(highlights);
+    // console.log(highlights);
     console.log(highlights.length, 'highlights found');
     const uniqueBooks = highlights.length;
     const totalFee = uniqueBooks * PROCESSING_FEE_PER_BOOK;
