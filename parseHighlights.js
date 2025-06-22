@@ -27,8 +27,9 @@ function parseBookNameAndAuthor(bookNameAndAuthor) {
 
 function parsePageLocationTimestamp(data) {
     var page = '';
-    var location = '';
+    var location = {start: undefined, end: undefined};
     var timestamp = '';
+    var locationString = '';
     var quoteType = '';
 
     data = data.trimRight();
@@ -46,10 +47,11 @@ function parsePageLocationTimestamp(data) {
     if (locationExists !== -1){
         let i = locationExists + 9; // 9 is the length of "location "
         while (i < data.length && data[i] !== ' ') {
-            location += data[i];    
+            locationString += data[i];    
             i++;
         }
     }
+    location = parseLocation(locationString);
 
     const timestampExists = data.search("Added on")
     if (timestampExists !== -1){
@@ -94,17 +96,19 @@ function createBook(books, bookName, author) {
     books.push(book);
 }
 
-function addUserHighlightInBook(books, bookname, author, highlight, page, location, timestamp, type) {
-    let locObj = parseLocation(location);
+function addUserHighlightInBook(books, bookname, author, highlight, page, location, timestamp, type) {    
     
+    if(highlight === '')
+        return;
+
     const highlightObject = {
         highlight: highlight,
         page: page,
         location: location,
         timestamp: timestamp,
         type: type,
-        locStart: locObj.start,
-        locEnd: locObj.end
+        // locStart: locObj.start,
+        // locEnd: locObj.end
     };
 
     for (var i = 0; i < books.length; i++) {
@@ -130,7 +134,7 @@ function parseHighlights(fileContent) {
     var bookName = '';
     var currentNote = '';
     var page = '';
-    var location = '';
+    var location = {start: undefined, end: undefined};
     var timestamp = '';
     var currentNoteType = '';
     var i = 0;
@@ -216,22 +220,22 @@ function parseLocation(location) {
 
 function purgeOverlappingHighlights(highlights) {
     if (!highlights.length) return [];
-    const solution = [];
+    const updatedHighlights = [];
 
-    // sort highlights by locStart here
-    highlights.sort((a, b) => a.locStart - b.locStart);
+    // sort highlights by location.start here
+    highlights.sort((a, b) => a.location.start - b.location.start);
 
     let current = highlights[0];
 
     // for the edge case that the user has only one highlight in a book.
     // If this is not done we will end up getting an empty pdf with book name and author but no highlights.
     if(highlights.length === 1) {
-        solution.push(current);
+        updatedHighlights.push(current);
     }
 
     for (let i = 1; i < highlights.length; i++) {
         const next = highlights[i];
-        if (current.locEnd >= next.locStart) {
+        if (current.location.end >= next.location.start) {
             // Overlapping or touching intervals, keep the latest one out of the two
             let currentTime = new Date(current.timestamp).getTime();
             let nextTime = new Date(next.timestamp).getTime();
@@ -242,11 +246,11 @@ function purgeOverlappingHighlights(highlights) {
             // current.locEnd = Math.max(current.locEnd, next.locEnd);
         } else {
             // No overlap, push the current highlight and move to the next
-            solution.push(current);
+            updatedHighlights.push(current);
             current = next;
         }
     }
-    return solution;
+    return updatedHighlights;
 }
 
 function removeRedundantHighlights(books){
@@ -254,7 +258,7 @@ function removeRedundantHighlights(books){
     books.forEach(book => {
         // let highlights = book.highlights;
         // Sort highlights by the start of their location (handles both "824" and "824-835")
-        // highlights.sort((a, b) => a.locStart - b.locStart);
+        // highlights.sort((a, b) => a.location.start - b.location.start);
         book.highlights = purgeOverlappingHighlights(book.highlights);
         totalHighlights += book.highlights.length;
 
@@ -288,4 +292,4 @@ function removeRedundantHighlights(books){
     return books;
 }
 
-module.exports = {parseHighlights}
+module.exports = {parseHighlights, purgeOverlappingHighlights}

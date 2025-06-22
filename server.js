@@ -20,6 +20,7 @@ const {setProgress, deleteProgress, getProgress} = require('./progress.js');
 const { router: authRoutes, authenticate } = require('./auth.js');
 const User = require('./models/User'); // Adjust path as needed
 const Book = require('./models/Books'); // Adjust path as needed
+const purgeOverlappingHighlights = parseHighlights.purgeOverlappingHighlights; // Import the function to purge overlapping highlights
 
 const FRONTEND_URL = process.env.FRONTEND_URL; // Default to localhost if not set
 const allowedOrigins = [
@@ -61,18 +62,96 @@ const PROCESSING_FEE_PER_BOOK = process.env.PROCESSING_FEE_PER_BOOK; // Set your
 // into a try-catch block to handle errors gracefully.
 
 // currently overwrites highlights for pre-existing books
-async function saveHighlightsToUserProfile(highlights, userId) {
-  for (const highlight of highlights) {
-    // console.log('Processing highlight:', highlight);
-    // console.log('User ID:', userId);
 
-      let bookHighlights = [];
-      for(const h of highlight.highlights) {
+function compareHighlights(highlight1, highlight2) {
+  let result = highlight1.highlight === highlight2.highlight &&
+         highlight1.type === highlight2.type &&
+         highlight1.page === highlight2.page &&
+         highlight1.location.start === highlight2.location.start &&
+         highlight1.location.end === highlight2.location.end;
+
+  if(!result) {
+    console.log(highlight1)
+    console.log(highlight2)
+  } else {
+    // console.log('Highlights do not match:', highlight1.highlight, highlight2.highlight);
+  }
+
+  return result;
+}
+
+function checkForNewHighlights(highlights, existingHighlightsOnCloud) {
+  if(highlights.length !== existingHighlightsOnCloud.length) 
+    return true; 
+
+  highlights.sort((a, b) => a.location.start - b.location.start);
+  existingHighlightsOnCloud.sort((a, b) => a.location.start - b.location.start);
+
+  // if(highlights.length < existingHighlightsOnCloud.length){
+  //   // check if all the current highlights are present in the existing highlights
+  //   for(let i = 0; i < highlights.length; i++) {
+  //     let found = false;
+  //     for(let j = 0; j < existingHighlightsOnCloud.length; j++) {
+  //       if(existingHighlightsOnCloud[j].locaton.start > highlights[i].location.start)
+  //           break; // No need to check further if the existing highlight starts after the current highlight
+  //       if(compareHighlights(highlights[i], existingHighlightsOnCloud[j])) {
+  //         found = true;
+  //         break;
+  //       }
+  //     }
+  //     if(!found) {
+  //       console.log('Highlight not found:', highlights[i]);
+  //       return true; // If any highlight is not found, return true
+  //     }
+  //   }
+  //   return false; // All highlights are present in the existing highlights
+  // }
+
+  // #todo iplement an algorithm to check whether the highlights uploaded are already present on cloud highlights or not.
+
+  for( let i = 0; i < highlights.length; i++) {
+    if(!compareHighlights(highlights[i], existingHighlightsOnCloud[i])) {
+      return true;
+    }
+  } 
+
+  return false;
+}
+
+async function saveHighlightsToUserProfile(highlights, userId) {
+    const savePromises = [];
+
+  for (const highlight of highlights) {
+
+    let book = await Book.findOne({ userId, title: highlight.name, author: highlight.author });
+    if (book) {
+      let newHighlightsPresent = checkForNewHighlights(highlight.highlights, book.highlights);
+      // console.log('new highlights present:', newHighlightsPresent, 'for book:', highlight.name, 'for user:', userId);
+
+      if(newHighlightsPresent){
+        let combinedHighlights = [...book.highlights, ...highlight.highlights];
+        book.highlights = purgeOverlappingHighlights(combinedHighlights);
+        console.log('Saving Changes for book:', highlight.name, 'for user:', userId);
+        savePromises.push(book.save());
+      }else{
+        // console.log('No changes in highlights for book:', highlight.name, 'for user:', userId);
+      }
+      continue;
+    }
+
+    let bookHighlights = [];
+
+    for(const h of highlight.highlights) {
+        // I want to check if the book already exists for the user
+        // If it does, I want to update the highlights for that book
+        // If it doesn't, I want to create a new book with the highlights
+
+
         let temp = {
           highlight : String(h.highlight).trim(), // Ensure highlight is a string
           type : String(h.type).trim(), // "highlight", "note", "bookmark"
           page : String(h.page).trim(), // Ensure page is a string
-          location : { start: Number(h.locStart), end: Number(h.locEnd) }, // Store location
+          location : { start: Number(h.location.start), end: Number(h.location.end) }, // Store location
           timestamp : String(h.timestamp).trim() // Ensure timestamp is a string
         }
 
@@ -82,10 +161,8 @@ async function saveHighlightsToUserProfile(highlights, userId) {
         bookHighlights.push(temp);
         // bookHighlights.push({highlight: String(h.highlight).trim(), type: String(h.type).trim(), timestamp: String(h.timestamp).trim()});
       }
-    // console.log('highglight:', highlight);
-      // console.log('Saving highlights for book:', highlight.name, 'by user:', userId);
       // Create a new book entry if it doesn't exist
-      const book = new Book({
+      book = new Book({
         userId,
         title: highlight.name,
         author: highlight.author,
@@ -93,15 +170,9 @@ async function saveHighlightsToUserProfile(highlights, userId) {
         // highlights: highlight.highlights // Spread operator to add highlights
       });
 
-      // console.log(typeof(bookHighlights[0].timestamp));
-      // console.log(book);
-      // console.log(book.highlights);
-      // console.log(bookHighlights);
-      // console.log(highlight.highlights);
-      // console.log('bookHighlights:', bookHighlights);
-      // console.log('bookHighlights[0]:', bookHighlights[0]);
-    await book.save();
+    savePromises.push(book.save());
   }
+  await Promise.all(savePromises);
 }
 
 app.post('/get-user-highlights-json', authenticate, upload.single('file'), async (req, res) => {

@@ -22,7 +22,7 @@ const BookSchema = new mongoose.Schema({
       start: {type: Number, required: true}, // Start location in the book
       end: {type: Number, required: true} // End location in the book
     },
-    timestamp: { type: Date, default: Date.now }, // Store timestamp as a Date
+    timestamp: { type: Date }, // Store timestamp as a Date
   }],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
