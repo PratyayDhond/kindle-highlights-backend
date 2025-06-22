@@ -24,7 +24,8 @@ const FRONTEND_URL = process.env.FRONTEND_URL; // Default to localhost if not se
 const allowedOrigins = [
   FRONTEND_URL,
   'http://localhost:8080',
-  'http://127.0.0.1:8080'
+  'http://127.0.0.1:8080',
+  'http://192.168.1.34:8080', // Replace with your local IP if needed
 ];
 
 // CORS middleware should be first!

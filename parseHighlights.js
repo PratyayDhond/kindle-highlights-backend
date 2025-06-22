@@ -224,11 +224,20 @@ function purgeOverlappingHighlights(highlights) {
     let current = highlights[0];
     for (let i = 1; i < highlights.length; i++) {
         const next = highlights[i];
-        if (current.locEnd >= next.locStart) {
+
+        if(current.type === 'note'){
+            solution.push(current);
+            current = next;
+            continue;
+        }
+
+        if (current.locEnd >= next.locStart) { 
+            // notes will be overlapping with highlights and should be saved
             // Overlapping or touching intervals, keep the latest one out of the two
             let currentTime = new Date(current.timestamp).getTime();
             let nextTime = new Date(next.timestamp).getTime();
             if (nextTime > currentTime) {
+                // console.log(current)
                 // If next highlight is more recent, update current and forget about it ;)
                 current = next
             }
