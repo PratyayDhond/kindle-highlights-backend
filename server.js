@@ -19,6 +19,7 @@ const getHighlightsZip = require('./getHighlightsZip.js'); // Import the functio
 const {setProgress, deleteProgress, getProgress} = require('./progress.js');
 const { router: authRoutes, authenticate } = require('./auth.js');
 const User = require('./models/User'); // Adjust path as needed
+const Book = require('./models/Books'); // Adjust path as needed
 
 const FRONTEND_URL = process.env.FRONTEND_URL; // Default to localhost if not set
 const allowedOrigins = [
@@ -48,12 +49,69 @@ const upload = multer({ dest: 'uploads/' }); // Uploaded files will go here
 
 const PROCESSING_FEE_PER_BOOK = process.env.PROCESSING_FEE_PER_BOOK; // Set your fee
 
+// #todo
+// # deal with overloading reuploaded highlights with updateded highlights
+
+// #todo
+// update location field for highlights to store start and end locations across the codebase.
+// Making this the norm will be helpful overall for future updates.
+
+// #todo 
+// nest all the code that makes call to any other function with an await or outside the codebase 
+// into a try-catch block to handle errors gracefully.
+
+// currently overwrites highlights for pre-existing books
+async function saveHighlightsToUserProfile(highlights, userId) {
+  for (const highlight of highlights) {
+    // console.log('Processing highlight:', highlight);
+    // console.log('User ID:', userId);
+
+      let bookHighlights = [];
+      for(const h of highlight.highlights) {
+        let temp = {
+          highlight : String(h.highlight).trim(), // Ensure highlight is a string
+          type : String(h.type).trim(), // "highlight", "note", "bookmark"
+          page : String(h.page).trim(), // Ensure page is a string
+          location : { start: Number(h.locStart), end: Number(h.locEnd) }, // Store location
+          timestamp : String(h.timestamp).trim() // Ensure timestamp is a string
+        }
+
+        if(temp.highlight === '') { // this handles deleted notes and highlights as well as bookmarks.
+          continue;
+        }
+        bookHighlights.push(temp);
+        // bookHighlights.push({highlight: String(h.highlight).trim(), type: String(h.type).trim(), timestamp: String(h.timestamp).trim()});
+      }
+    // console.log('highglight:', highlight);
+      // console.log('Saving highlights for book:', highlight.name, 'by user:', userId);
+      // Create a new book entry if it doesn't exist
+      const book = new Book({
+        userId,
+        title: highlight.name,
+        author: highlight.author,
+        highlights: bookHighlights, // Store the highlights array
+        // highlights: highlight.highlights // Spread operator to add highlights
+      });
+
+      // console.log(typeof(bookHighlights[0].timestamp));
+      // console.log(book);
+      // console.log(book.highlights);
+      // console.log(bookHighlights);
+      // console.log(highlight.highlights);
+      // console.log('bookHighlights:', bookHighlights);
+      // console.log('bookHighlights[0]:', bookHighlights[0]);
+    await book.save();
+  }
+}
+
 app.post('/get-user-highlights-json', authenticate, upload.single('file'), async (req, res) => {
   const userId = req.user.userId;
   const user = await User.findById(userId);
   if (!user) return res.status(401).json({ message: 'User not found' });
 
   const file = req.file;
+  const consent = req.body.consent; 
+   console.log('Data Storage Consent:', consent);
    console.log('Inside get-user-highlights-json');
    console.log('File:', file);
    console.log('File path:', file.path);
@@ -77,6 +135,12 @@ app.post('/get-user-highlights-json', authenticate, upload.single('file'), async
     console.log("Total fee for processing:", totalFee, "for", uniqueBooks, "books");
     if (user.coins < totalFee) {
       return res.status(402).json({ message: `Not enough coins. You need ${totalFee} coins for ${uniqueBooks} books.` });
+    }
+
+    if(consent === 'true') {
+      // Save Books for user's profile
+      await saveHighlightsToUserProfile(highlights, userId);
+
     }
 
     user.coins -= totalFee;
@@ -108,6 +172,13 @@ app.get('/coins', authenticate, async (req, res) => {
 
 app.get('/version', (req, res) => {
   res.json({ version: process.env.VERSION || 'unknown' });
+});
+
+app.get('/user/books', authenticate, async (req, res) => {
+  const books = await Book.find({ userId: req.user.userId }, 'title author');
+  console.log('Fetched books for user:', req.user.userId);
+  console.log('Books:', books);
+  res.json({ books });
 });
 
 // Connect to MongoDB

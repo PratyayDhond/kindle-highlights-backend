@@ -49,3 +49,8 @@ A Node.js + Express backend service that allows users to:
 
 - Fixed Static Free Signup coins (500 coins) being sent in welcome mail. Now fetching dynamic value from environment variable.
 - Added Redundant Highlights removal via overlapping sub-intervals solution.
+
+### 1.2.1
+
+- Updated Rendundancy Removal algorithm to ignore notes, and include all notes in the highlights regardless of the overlap with the highlights for the loc field.
+- Fixed Redundancy Removal removing note/highlight if only 1 present in the book. \[Weird Edge case bug I will say]

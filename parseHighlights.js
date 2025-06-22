@@ -222,6 +222,13 @@ function purgeOverlappingHighlights(highlights) {
     highlights.sort((a, b) => a.locStart - b.locStart);
 
     let current = highlights[0];
+
+    // for the edge case that the user has only one highlight in a book.
+    // If this is not done we will end up getting an empty pdf with book name and author but no highlights.
+    if(highlights.length === 1) {
+        solution.push(current);
+    }
+
     for (let i = 1; i < highlights.length; i++) {
         const next = highlights[i];
         if (current.locEnd >= next.locStart) {

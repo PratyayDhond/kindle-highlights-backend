@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { mdToPdf } = require('md-to-pdf');
 const {setProgress, getBookCount, getProgress} = require('./progress.js');
-
+// #todo cd the naming convention from book.name to book.title 
 function createMarkdownFiles(highlights, jobId) {
     console.timeLog('getHighlightsZip', 'Started createMarkdownFiles');
 
