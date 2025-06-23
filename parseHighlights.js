@@ -27,7 +27,7 @@ function parseBookNameAndAuthor(bookNameAndAuthor) {
 
 function parsePageLocationTimestamp(data) {
     var page = '';
-    var location = {start: undefined, end: undefined};
+    var location = {start: -1, end: -1};
     var timestamp = '';
     var locationString = '';
     var quoteType = '';
@@ -157,6 +157,11 @@ function parseHighlights(fileContent) {
         var dataLine2 = rawData[i].trimRight();
         [page, location, timestamp, currentNoteType] = parsePageLocationTimestamp(dataLine2);
 
+        if(currentNoteType === 'unknown' && location.start === -1 && location.end === -1) {
+            console.log('Incorrect file uploaded'); // this is not a valid kindle clippings file
+            // Here we are setting error code to 418 (I'm a teapot) as a playful way to indicate that the file is not a valid Kindle clippings file.
+            return {status: 'error', message: 'Incorrect file uploaded. Please upload a valid Kindle clippings file.', statusCode: 418};
+        }
         i+= 1; // skip the next line which is a separator
         //  console.log("Current Line:", rawData[i]);
         while( i < rawData.length && rawData[i].trim() !== note_sep){
@@ -168,7 +173,10 @@ function parseHighlights(fileContent) {
             currentNote = currentNote.slice(0, -1);
         }
 
-        // Creating Book if not already exists
+        // // Creating Book if not already exists
+        // console.log(`Processing book: ${bookName}, Author: ${author}`);
+        // console.log(`Current Note: ${currentNote}`);
+        // console.log(`Page: ${page}, Location: ${location.start}-${location.end}, Timestamp: ${timestamp}, Type: ${currentNoteType}`);
         
         book = bookExists(books, bookName)
         if(book === -1){
@@ -206,16 +214,17 @@ function dataToArray(data) {
 
 
 function parseLocation(location) {
-    if (!location) return { start: 0, end: 0 };
+    if (!location) return { start: -1, end: -1 };
     if (typeof location === 'number') return { start: location, end: location };
     const parts = location.split('-').map(x => parseInt(x.trim(), 10));
     if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
         return { start: parts[0], end: parts[1] };
     }
     if (parts.length === 1 && !isNaN(parts[0])) {
-        return { start: parts[0], end: parts[0] };
+        return { start: parts[0], end: -1 }; // end is -1 if only start is provided
     }
-    return { start: 0, end: 0 };
+    console.error(`Invalid location format: ${location}`);
+    return { start: -1, end: -1 };
 }
 
 function purgeOverlappingHighlights(highlights) {

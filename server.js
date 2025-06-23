@@ -199,6 +199,10 @@ app.post('/get-user-highlights-json', authenticate, upload.single('file'), async
     }
 
     const highlights = parseHighlights.parseHighlights(data);
+    if(highlights.status === 'error') {
+
+      return res.status(highlights.statusCode).json({ message: highlights.message });
+    }
     // console.log(highlights);
     console.log(highlights.length, 'highlights found');
     const uniqueBooks = highlights.length;
@@ -262,10 +266,12 @@ mongoose.connect(process.env.MONGODB_URI)
 
 app.listen(PORT, () =>  console.log(`Server running on port ${PORT}`));
 
-// #todo
-// check for missing dependencies and add them to package.json
 
 // #todo
-// add coins to User model and add a route to get coins for a user
-// add coins consumption for highlight processing
-// coins are a currency for features
+// Uploaded File validation
+
+// #todo
+// Implement api calls for accessing user data on frontend
+// Display user data on the frontend
+// Add search bar on frontend to search for books
+// Implement pagination for books and highlights on frontend
