@@ -218,6 +218,8 @@ function parseLocation(location) {
     if (typeof location === 'number') return { start: location, end: location };
     const parts = location.split('-').map(x => parseInt(x.trim(), 10));
     if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        if(parts[0] === parts[1])
+            return { start: parts[0], end: -1 };
         return { start: parts[0], end: parts[1] };
     }
     if (parts.length === 1 && !isNaN(parts[0])) {
