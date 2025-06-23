@@ -15,7 +15,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 // const SECRET = 'supersecret';
 const parseHighlights = require('./parseHighlights.js'); // Import the highlight parsing function
-const getHighlightsZip = require('./getHighlightsZip.js'); // Import the function to create zip from highlights
 const {setProgress, deleteProgress, getProgress} = require('./progress.js');
 const { router: authRoutes, authenticate } = require('./auth.js');
 const User = require('./models/User'); // Adjust path as needed
@@ -64,20 +63,20 @@ const PROCESSING_FEE_PER_BOOK = process.env.PROCESSING_FEE_PER_BOOK; // Set your
 // currently overwrites highlights for pre-existing books
 
 function compareHighlights(highlight1, highlight2) {
-  let result = highlight1.highlight === highlight2.highlight &&
+  return highlight1.highlight === highlight2.highlight &&
          highlight1.type === highlight2.type &&
          highlight1.page === highlight2.page &&
          highlight1.location.start === highlight2.location.start &&
          highlight1.location.end === highlight2.location.end;
 
-  if(!result) {
-    console.log(highlight1)
-    console.log(highlight2)
-  } else {
-    // console.log('Highlights do not match:', highlight1.highlight, highlight2.highlight);
-  }
+  // if(!result) {
+  //   console.log(highlight1)
+  //   console.log(highlight2)
+  // } else {
+  //   // console.log('Highlights do not match:', highlight1.highlight, highlight2.highlight);
+  // }
 
-  return result;
+  // return result;
 }
 
 function checkForNewHighlights(highlights, existingHighlightsOnCloud) {
@@ -86,26 +85,6 @@ function checkForNewHighlights(highlights, existingHighlightsOnCloud) {
 
   highlights.sort((a, b) => a.location.start - b.location.start);
   existingHighlightsOnCloud.sort((a, b) => a.location.start - b.location.start);
-
-  // if(highlights.length < existingHighlightsOnCloud.length){
-  //   // check if all the current highlights are present in the existing highlights
-  //   for(let i = 0; i < highlights.length; i++) {
-  //     let found = false;
-  //     for(let j = 0; j < existingHighlightsOnCloud.length; j++) {
-  //       if(existingHighlightsOnCloud[j].locaton.start > highlights[i].location.start)
-  //           break; // No need to check further if the existing highlight starts after the current highlight
-  //       if(compareHighlights(highlights[i], existingHighlightsOnCloud[j])) {
-  //         found = true;
-  //         break;
-  //       }
-  //     }
-  //     if(!found) {
-  //       console.log('Highlight not found:', highlights[i]);
-  //       return true; // If any highlight is not found, return true
-  //     }
-  //   }
-  //   return false; // All highlights are present in the existing highlights
-  // }
 
   // #todo iplement an algorithm to check whether the highlights uploaded are already present on cloud highlights or not.
 
@@ -252,7 +231,7 @@ app.get('/version', (req, res) => {
 app.get('/user/books', authenticate, async (req, res) => {
   const books = await Book.find({ userId: req.user.userId }, 'title author');
   console.log('Fetched books for user:', req.user.userId);
-  console.log('Books:', books);
+  console.log('Total books found:', books.length);
   res.json({ books });
 });
 

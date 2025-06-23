@@ -172,11 +172,6 @@ function parseHighlights(fileContent) {
         if (currentNote.length > 0 && currentNote[currentNote.length - 1] === '\n') {
             currentNote = currentNote.slice(0, -1);
         }
-
-        // // Creating Book if not already exists
-        // console.log(`Processing book: ${bookName}, Author: ${author}`);
-        // console.log(`Current Note: ${currentNote}`);
-        // console.log(`Page: ${page}, Location: ${location.start}-${location.end}, Timestamp: ${timestamp}, Type: ${currentNoteType}`);
         
         book = bookExists(books, bookName)
         if(book === -1){
@@ -267,37 +262,8 @@ function purgeOverlappingHighlights(highlights) {
 function removeRedundantHighlights(books){
     let totalHighlights = 0;
     books.forEach(book => {
-        // let highlights = book.highlights;
-        // Sort highlights by the start of their location (handles both "824" and "824-835")
-        // highlights.sort((a, b) => a.location.start - b.location.start);
         book.highlights = purgeOverlappingHighlights(book.highlights);
         totalHighlights += book.highlights.length;
-
-        // for(let i = 0; i < highlights.length; i++){
-            // console.log(`location: ${highlights[i].location}, locStart: ${highlights[i].locStart}, locEnd: ${highlights[i].locEnd}`);            
-            // for(let j = i+1; j < highlights.length; j++){
-
-
-                // let simScore = getSimilarityScore(highlights[i].highlight, highlights[j].highlight);
-                // // console.log(`Similarity Score for pair ${i},${j} is ${simScore}`)
-                // let locDiff = Math.abs(highlights[i].location - highlights[j].location);
-                // let pageDiff = Math.abs(highlights[i].page - highlights[j].page);
-                // if(simScore > 0.25 && simScore < 0.40 && (locDiff <= 4 || pageDiff < 1)){
-                //     console.log(highlights[i].highlight)
-                //     console.log(highlights[j].highlight)
-                //     console.log(simScore)
-                //     console.log(".")
-                // }
-
-                // what if we instead cross check the loc on which the highlight was made.
-                // If the highlights have overlapping loc we keep the latest one
-
-                // now compare the i with j and see if they overlap, if they overlap keep the current one and remove the past one from highlights.
-
-
-
-            // }
-        // }
     });
     console.log(`Total highlights after removing redundant ones: ${totalHighlights}`);
     return books;
