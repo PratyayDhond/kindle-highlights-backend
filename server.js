@@ -235,6 +235,17 @@ app.get('/user/books', authenticate, async (req, res) => {
   res.json({ books });
 });
 
+app.get('/user/book/:bookId', authenticate, async (req, res) => {
+  const bookId = req.params.bookId;
+  const userId = req.user.userId;
+  const book = await Book.findOne({ userId, _id: bookId }, 'title author highlights');
+  if (!book) {
+    return res.status(404).json({ message: 'Book not found' });
+  }
+  console.log(book)
+  res.json({ book });
+});
+
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
 .then(() =>  console.log('MongoDB connected!'))
@@ -254,3 +265,6 @@ app.listen(PORT, () =>  console.log(`Server running on port ${PORT}`));
 // Display user data on the frontend
 // Add search bar on frontend to search for books
 // Implement pagination for books and highlights on frontend
+
+// #todo 
+// write an api call for uploading a new kindle clippings file and updating the user's profile with the new highlights.without generating highlights zip.

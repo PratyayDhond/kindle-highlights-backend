@@ -270,3 +270,4 @@ function removeRedundantHighlights(books){
 }
 
 module.exports = {parseHighlights, purgeOverlappingHighlights}
+
