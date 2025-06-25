@@ -190,7 +190,16 @@ function parseHighlights(fileContent) {
     setBookCount(books.length);
      console.log('Parsing completed. Total books:', books.length);
      console.log('Total highlights:', totalHighlights);
-    return removeRedundantHighlights(books);
+    let [updatedBooks, updatedTotalHighlights] = removeRedundantHighlights(books);
+
+    let stats = {
+        totalBooks: updatedBooks.length,
+        totalHighlights: updatedTotalHighlights,
+        avgHighlights: updatedTotalHighlights / updatedBooks.length,
+        maxHighlights: Math.max(...updatedBooks.map(book => book.highlights.length)),
+        updatedAt: new Date()
+    }
+    return { highlights: updatedBooks, stats };
 }
 
 function dataToArray(data) {
@@ -266,7 +275,7 @@ function removeRedundantHighlights(books){
         totalHighlights += book.highlights.length;
     });
     console.log(`Total highlights after removing redundant ones: ${totalHighlights}`);
-    return books;
+    return [books, totalHighlights];
 }
 
 module.exports = {parseHighlights, purgeOverlappingHighlights}

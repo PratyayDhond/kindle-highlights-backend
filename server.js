@@ -19,6 +19,7 @@ const {setProgress, deleteProgress, getProgress} = require('./progress.js');
 const { router: authRoutes, authenticate } = require('./auth.js');
 const User = require('./models/User'); // Adjust path as needed
 const Book = require('./models/Books'); // Adjust path as needed
+const UserStats = require('./models/UserStats'); // Adjust path as needed
 const purgeOverlappingHighlights = parseHighlights.purgeOverlappingHighlights; // Import the function to purge overlapping highlights
 
 const FRONTEND_URL = process.env.FRONTEND_URL; // Default to localhost if not set
@@ -151,12 +152,34 @@ async function saveHighlightsToUserProfile(highlights, userId) {
   await Promise.all(savePromises);
 }
 
+async function updateUserStats(stats, userId) {
+  try {
+    const updatedStats = await UserStats.findOneAndUpdate(
+      { userId },
+      {
+        totalBooks: Number(stats.totalBooks) || 0,
+        totalHighlights: Number(stats.totalHighlights) || 0,
+        avgHighlights: Number(stats.avgHighlights.toFixed(2)) || 0,
+        maxHighlights: Number(stats.maxHighlights) || 0,
+        updatedAt: new Date()
+      },
+      { upsert: true, new: true }
+    );
+    console.log('User stats updated:', updatedStats);
+    return updatedStats;
+  } catch (err) {
+    console.error('Error updating user stats:', err);
+    return null;
+  }
+} 
+
 app.post('/get-user-highlights-json', authenticate, upload.single('file'), async (req, res) => {
   const userId = req.user.userId;
   const user = await User.findById(userId);
   if (!user) return res.status(401).json({ message: 'User not found' });
 
   const file = req.file;
+  let stats = null;
   const consent = req.body.consent; 
    console.log('Data Storage Consent:', consent);
    console.log('Inside get-user-highlights-json');
@@ -174,12 +197,13 @@ app.post('/get-user-highlights-json', authenticate, upload.single('file'), async
       return res.status(500).json({ message: 'Error reading file' });
     }
 
-    const highlights = parseHighlights.parseHighlights(data);
-    if(highlights.status === 'error') {
-
-      return res.status(highlights.statusCode).json({ message: highlights.message });
+    const highlightsData = parseHighlights.parseHighlights(data);
+    const highlights = highlightsData.highlights;
+    if(highlightsData.status === 'error') {
+      return res.status(highlightsData.statusCode).json({ message: highlightsData.message });
     }
     // console.log(highlights);
+    await updateUserStats(data.stats,userId);
     console.log(highlights.length, 'highlights found');
     const uniqueBooks = highlights.length;
     const totalFee = uniqueBooks * PROCESSING_FEE_PER_BOOK * DOWNLOAD_FEE_FOR_HIGHLIGHTS;
@@ -191,7 +215,9 @@ app.post('/get-user-highlights-json', authenticate, upload.single('file'), async
     if(consent === 'true') {
       // Save Books for user's profile
       await saveHighlightsToUserProfile(highlights, userId);
-
+      stats = await updateUserStats(highlightsData.stats, userId);
+      if(stats && stats.updatedAt)
+        user.updatedAt = stats.updatedAt; // Update user's last updated time
     }
 
     user.coins -= totalFee;
@@ -199,7 +225,8 @@ app.post('/get-user-highlights-json', authenticate, upload.single('file'), async
     return res.json({ 
       message: `Highlights processed successfully. Charged ${totalFee} coins for ${uniqueBooks} books.`,
       highlights,
-      coins: user.coins
+      coins: user.coins,
+      stats: stats
     });
   });
 });
@@ -263,11 +290,11 @@ app.post('/user/upload-highlights-file', authenticate, upload.single('file'), as
       return res.status(500).json({ message: 'Error reading file' });
     }
 
-    const highlights = parseHighlights.parseHighlights(data);
-    if (highlights.status === 'error') {
-      return res.status(highlights.statusCode).json({ message: highlights.message });
+    const highlightsData = parseHighlights.parseHighlights(data);
+    const highlights = highlightsData.highlights;
+    if (highlightsData.status === 'error') {
+      return res.status(highlightsData.statusCode).json({ message: highlightsData.message });
     }
-
     console.log(highlights.length, 'highlights found');
     const uniqueBooks = highlights.length;
     const totalFee = uniqueBooks * PROCESSING_FEE_PER_BOOK;
@@ -280,17 +307,39 @@ app.post('/user/upload-highlights-file', authenticate, upload.single('file'), as
 
     // Save Highlights for user's profile
     await saveHighlightsToUserProfile(highlights, userId);
+    let stats = await updateUserStats(highlightsData.stats, userId);
 
     user.coins -= totalFee;
+    if(stats && stats.updatedAt)
+      user.updatedAt = stats.updatedAt; // Update user's last updated time
     await user.save();
 
     return res.json({
       message: 'Highlights uploaded successfully',
       highlights,
       success: true,
-      coins: user.coins
+      coins: user.coins,
+      stats: stats
      });
   });
+});
+
+app.get('/user/stats', authenticate, async (req, res) => {
+  let stats = await UserStats.findOne({ userId: req.user.userId });
+  console.log(stats)
+  if (!stats) {
+    stats = new UserStats({
+      userId: req.user.userId,
+      totalBooks: 0,
+      totalHighlights: 0,
+      avgHighlights: 0,
+      medianHighlights: 0,
+      maxHighlights: 0,
+      updatedAt: new Date()
+    });
+    await stats.save();
+  }
+  res.json({ stats });
 });
 
 
