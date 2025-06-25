@@ -64,37 +64,37 @@ const DOWNLOAD_FEE_FOR_HIGHLIGHTS = process.env.DOWNLOAD_FEE_FOR_HIGHLIGHTS || 1
 // currently overwrites highlights for pre-existing books
 
 function compareHighlights(highlight1, highlight2) {
-  return highlight1.highlight === highlight2.highlight &&
-         highlight1.type === highlight2.type &&
-         highlight1.page === highlight2.page &&
-         highlight1.location.start === highlight2.location.start &&
-         highlight1.location.end === highlight2.location.end;
-
-  // if(!result) {
-  //   console.log(highlight1)
-  //   console.log(highlight2)
-  // } else {
-  //   // console.log('Highlights do not match:', highlight1.highlight, highlight2.highlight);
-  // }
-
-  // return result;
+  return (
+    (highlight1.highlight.trim() || '') === (highlight2.highlight.trim() || '') &&
+    (highlight1.type.trim() || '') === (highlight2.type.trim() || '') &&
+    (highlight1.page.trim() || '') === (highlight2.page.trim() || '') &&
+    highlight1.location &&
+    highlight2.location &&
+    Number(highlight1.location.start) === Number(highlight2.location.start) &&
+    Number(highlight1.location.end) === Number(highlight2.location.end)
+  );
 }
 
 function checkForNewHighlights(highlights, existingHighlightsOnCloud) {
-  if(highlights.length !== existingHighlightsOnCloud.length) 
-    return true; 
+  // If there are more highlights locally than on the cloud, there must be new ones
+  if (highlights.length > existingHighlightsOnCloud.length) return true;
 
+  // Sort both arrays for consistent comparison
   highlights.sort((a, b) => a.location.start - b.location.start);
   existingHighlightsOnCloud.sort((a, b) => a.location.start - b.location.start);
 
-  // #todo iplement an algorithm to check whether the highlights uploaded are already present on cloud highlights or not.
-
-  for( let i = 0; i < highlights.length; i++) {
-    if(!compareHighlights(highlights[i], existingHighlightsOnCloud[i])) {
-      return true;
+  // For each local highlight, check if it exists in the cloud highlights
+  for (let i = 0; i < highlights.length; i++) {
+    const found = existingHighlightsOnCloud.some(cloudHighlight =>
+      compareHighlights(highlights[i], cloudHighlight)
+    );
+    if (!found) {
+      // If any local highlight is not found in the cloud, return true (new highlight present)
+        return true;
     }
-  } 
+  }
 
+  // All local highlights are present in the cloud (cloud may have more)
   return false;
 }
 
@@ -110,8 +110,10 @@ async function saveHighlightsToUserProfile(highlights, userId) {
 
       if(newHighlightsPresent){
         let oldHighlightsCount = book.highlights.length;
+        
         let combinedHighlights = [...book.highlights, ...highlight.highlights];
         book.highlights = purgeOverlappingHighlights(combinedHighlights);
+        
         newHighlights += book.highlights.length - oldHighlightsCount;
         // console.log('Saving Changes for book:', highlight.name, 'for user:', userId);
         savePromises.push(book.save());
@@ -138,6 +140,10 @@ async function saveHighlightsToUserProfile(highlights, userId) {
         if(temp.highlight === '') { // this handles deleted notes and highlights as well as bookmarks.
           continue;
         }
+
+        // if(temp.type === 'note')
+        //   console.log('Note found:', temp.highlight, 'at', temp.location.start, 'for book:', highlight.name);
+
         bookHighlights.push(temp);
         // bookHighlights.push({highlight: String(h.highlight).trim(), type: String(h.type).trim(), timestamp: String(h.timestamp).trim()});
       }
@@ -393,3 +399,6 @@ app.listen(PORT, () =>  console.log(`Server running on port ${PORT}`));
 
 // #todo
 // redundancy removal not working for locations with start = 2000 and no end i.e. end = -1, so when there is single start, we still have to check for the overlap.
+
+// #todo
+// #for stats : When checking for unique quotes, lets just do a n*n instead of trying to save time using overlapping interval, it isn't saving much since we are sorting anyways.

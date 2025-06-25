@@ -199,7 +199,7 @@ function parseHighlights(fileContent) {
         maxHighlights: Math.max(...updatedBooks.map(book => book.highlights.length)),
         updatedAt: new Date()
     }
-    return { highlights: updatedBooks, stats };
+    return { highlights: books, stats };
 }
 
 function dataToArray(data) {
@@ -237,8 +237,21 @@ function purgeOverlappingHighlights(highlights) {
     if (!highlights.length) return [];
     const updatedHighlights = [];
 
+
     // sort highlights by location.start here
-    highlights.sort((a, b) => a.location.start - b.location.start);
+    highlights.sort((a, b) => {
+      if (a.type !== b.type) {
+        return a.type.localeCompare(b.type);
+      }
+      
+      if (a.location.start !== b.location.start) {
+        return a.location.start - b.location.start;
+      }
+      // Keep notes before highlights if at the same location
+
+      // If still equal, sort by timestamp
+      return new Date(a.timestamp) - new Date(b.timestamp);
+    });
 
     let current = highlights[0];
 
@@ -250,11 +263,34 @@ function purgeOverlappingHighlights(highlights) {
 
     for (let i = 1; i < highlights.length; i++) {
         const next = highlights[i];
-        if (current.location.end >= next.location.start) {
+
+        if(current.type === 'note'){
+            updatedHighlights.push(current);
+            current = next;
+            continue;
+        }
+
+        let currentStart = current.location.start;
+        let currentEnd = current.location.end === -1 ? current.location.start : current.location.end;
+        let nextStart = next.location.start;
+        let nextEnd = next.location.end === -1 ? next.location.start : next.location.end
+
+        if(currentStart === nextStart && currentEnd === nextEnd){
+            let currentTime = new Date(current.timestamp).getTime();
+            let nextTime = new Date(next.timestamp).getTime();
+            if (nextTime >= currentTime) {
+                // If next highlight is more recent, update current and forget about it ;)
+                current = next;
+            }
+            continue;
+        }
+
+        // if they overlap and are of the same type
+        if (currentEnd >= nextStart && current.type === next.type) {
             // Overlapping or touching intervals, keep the latest one out of the two
             let currentTime = new Date(current.timestamp).getTime();
             let nextTime = new Date(next.timestamp).getTime();
-            if (nextTime > currentTime) {
+            if (nextTime >= currentTime ) {
                 // If next highlight is more recent, update current and forget about it ;)
                 current = next
             }
@@ -264,7 +300,12 @@ function purgeOverlappingHighlights(highlights) {
             updatedHighlights.push(current);
             current = next;
         }
+
     }
+    // compare the current and next one last time
+
+    // updatedHighlights.push(highlights[highlights.length - 1]);
+    updatedHighlights.push(current);
     return updatedHighlights;
 }
 
@@ -274,6 +315,12 @@ function removeRedundantHighlights(books){
         book.highlights = purgeOverlappingHighlights(book.highlights);
         totalHighlights += book.highlights.length;
     });
+
+    // for(let i = 0; i < books.length; i++) {
+    //     books[i].highlights = purgeOverlappingHighlights(books[i].highlights);
+    //     totalHighlights += books[i].highlights.length;
+    // }
+
     console.log(`Total highlights after removing redundant ones: ${totalHighlights}`);
     return [books, totalHighlights];
 }
