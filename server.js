@@ -100,7 +100,8 @@ function checkForNewHighlights(highlights, existingHighlightsOnCloud) {
 
 async function saveHighlightsToUserProfile(highlights, userId) {
     const savePromises = [];
-
+    let newHighlights = 0;
+    let newBook = 0;
   for (const highlight of highlights) {
 
     let book = await Book.findOne({ userId, title: highlight.name, author: highlight.author });
@@ -108,9 +109,11 @@ async function saveHighlightsToUserProfile(highlights, userId) {
       let newHighlightsPresent = checkForNewHighlights(highlight.highlights, book.highlights);
 
       if(newHighlightsPresent){
+        let oldHighlightsCount = book.highlights.length;
         let combinedHighlights = [...book.highlights, ...highlight.highlights];
         book.highlights = purgeOverlappingHighlights(combinedHighlights);
-        console.log('Saving Changes for book:', highlight.name, 'for user:', userId);
+        newHighlights += book.highlights.length - oldHighlightsCount;
+        // console.log('Saving Changes for book:', highlight.name, 'for user:', userId);
         savePromises.push(book.save());
       }
       continue;
@@ -146,15 +149,35 @@ async function saveHighlightsToUserProfile(highlights, userId) {
         highlights: bookHighlights, // Store the highlights array
         // highlights: highlight.highlights // Spread operator to add highlights
       });
-
+      newBook += 1;
+      newHighlights += bookHighlights.length;
+      // #todo
+      // figure out why new highlights increase for the same file being reuploaded.
     savePromises.push(book.save());
   }
   await Promise.all(savePromises);
+  return [newBook, newHighlights > 0 ? newHighlights : 0];
 }
 
-async function updateUserStats(stats, userId) {
+async function updateUserStats(newBook, newHighlights, newMaxHighlights, fallbackStats, userId) {
   try {
-    const updatedStats = await UserStats.findOneAndUpdate(
+    let stats = await UserStats.findOne({ userId });
+    
+    if(stats){
+      stats.totalBooks += Number(newBook || 0);
+      stats.totalHighlights += Number(newHighlights || 0);
+      stats.avgHighlights = Number((stats.totalHighlights / (stats.totalBooks || 1)).toFixed(2));
+      stats.maxHighlights = Number(newMaxHighlights > stats.maxHighlights ? newMaxHighlights : stats.maxHighlights);
+      stats.updatedAt = new Date();
+      await stats.save();
+      return stats;
+    }
+  
+    if(!stats){
+      stats = fallbackStats;
+    }
+
+    stats = await UserStats.create(
       { userId },
       {
         totalBooks: Number(stats.totalBooks) || 0,
@@ -165,8 +188,8 @@ async function updateUserStats(stats, userId) {
       },
       { upsert: true, new: true }
     );
-    console.log('User stats updated:', updatedStats);
-    return updatedStats;
+    console.log('User stats updated:', stats);
+    return stats;
   } catch (err) {
     console.error('Error updating user stats:', err);
     return null;
@@ -203,7 +226,6 @@ app.post('/get-user-highlights-json', authenticate, upload.single('file'), async
       return res.status(highlightsData.statusCode).json({ message: highlightsData.message });
     }
     // console.log(highlights);
-    await updateUserStats(data.stats,userId);
     console.log(highlights.length, 'highlights found');
     const uniqueBooks = highlights.length;
     const totalFee = uniqueBooks * PROCESSING_FEE_PER_BOOK * DOWNLOAD_FEE_FOR_HIGHLIGHTS;
@@ -214,8 +236,10 @@ app.post('/get-user-highlights-json', authenticate, upload.single('file'), async
 
     if(consent === 'true') {
       // Save Books for user's profile
-      await saveHighlightsToUserProfile(highlights, userId);
-      stats = await updateUserStats(highlightsData.stats, userId);
+      let [newBook, newHighlights] = await saveHighlightsToUserProfile(highlights, userId);
+      let maxHighlights = Math.max(...highlights.map(book => book.highlights.length));
+
+      stats = await updateUserStats(newBook, newHighlights,maxHighlights, data.stats, userId);
       if(stats && stats.updatedAt)
         user.updatedAt = stats.updatedAt; // Update user's last updated time
     }
@@ -306,12 +330,13 @@ app.post('/user/upload-highlights-file', authenticate, upload.single('file'), as
 
 
     // Save Highlights for user's profile
-    await saveHighlightsToUserProfile(highlights, userId);
-    let stats = await updateUserStats(highlightsData.stats, userId);
-
-    user.coins -= totalFee;
+    let [newBook, newHighlights] = await saveHighlightsToUserProfile(highlights, userId);
+    let maxHighlights = Math.max(...highlights.map(book => book.highlights.length));
+    stats = await updateUserStats(newBook, newHighlights,maxHighlights, highlightsData.stats, userId);
     if(stats && stats.updatedAt)
       user.updatedAt = stats.updatedAt; // Update user's last updated time
+
+    user.coins -= totalFee;
     await user.save();
 
     return res.json({
