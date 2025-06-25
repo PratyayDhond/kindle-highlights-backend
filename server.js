@@ -48,7 +48,7 @@ app.use(authRoutes);
 const upload = multer({ dest: 'uploads/' }); // Uploaded files will go here
 
 const PROCESSING_FEE_PER_BOOK = process.env.PROCESSING_FEE_PER_BOOK; // Set your fee
-
+const DOWNLOAD_FEE_FOR_HIGHLIGHTS = process.env.DOWNLOAD_FEE_FOR_HIGHLIGHTS || 1; // Default to 1 if not set
 // #todo
 // # deal with overloading reuploaded highlights with updateded highlights
 
@@ -182,7 +182,7 @@ app.post('/get-user-highlights-json', authenticate, upload.single('file'), async
     // console.log(highlights);
     console.log(highlights.length, 'highlights found');
     const uniqueBooks = highlights.length;
-    const totalFee = uniqueBooks * PROCESSING_FEE_PER_BOOK;
+    const totalFee = uniqueBooks * PROCESSING_FEE_PER_BOOK * DOWNLOAD_FEE_FOR_HIGHLIGHTS;
     console.log("Total fee for processing:", totalFee, "for", uniqueBooks, "books");
     if (user.coins < totalFee) {
       return res.status(402).json({ message: `Not enough coins. You need ${totalFee} coins for ${uniqueBooks} books.` });
@@ -246,6 +246,8 @@ app.get('/user/book/:bookId', authenticate, async (req, res) => {
 app.post('/user/upload-highlights-file', authenticate, upload.single('file'), async (req, res) => {
   const userId = req.user.userId;
   const file = req.file;
+  const user = await User.findById(userId);
+  if (!user) return res.status(401).json({ message: 'User not found' });
 
   if (!file) {
     return res.status(400).json({ message: 'No file uploaded' });
@@ -266,10 +268,28 @@ app.post('/user/upload-highlights-file', authenticate, upload.single('file'), as
       return res.status(highlights.statusCode).json({ message: highlights.message });
     }
 
+    console.log(highlights.length, 'highlights found');
+    const uniqueBooks = highlights.length;
+    const totalFee = uniqueBooks * PROCESSING_FEE_PER_BOOK;
+    console.log("Total fee for processing:", totalFee, "for", uniqueBooks, "books");
+    if (user.coins < totalFee) {
+      return res.status(402).json({ message: `Not enough coins. You need ${totalFee} coins for ${uniqueBooks} books.` });
+    }
+
+
+
     // Save Highlights for user's profile
     await saveHighlightsToUserProfile(highlights, userId);
 
-    return res.json({ message: 'Highlights uploaded successfully', highlights });
+    user.coins -= totalFee;
+    await user.save();
+
+    return res.json({
+      message: 'Highlights uploaded successfully',
+      highlights,
+      success: true,
+      coins: user.coins
+     });
   });
 });
 
