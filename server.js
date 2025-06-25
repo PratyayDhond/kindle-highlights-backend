@@ -64,7 +64,7 @@ const DOWNLOAD_FEE_FOR_HIGHLIGHTS = process.env.DOWNLOAD_FEE_FOR_HIGHLIGHTS || 1
 // currently overwrites highlights for pre-existing books
 
 function compareHighlights(highlight1, highlight2) {
-  return (
+  let result = 
     (highlight1.highlight.trim() || '') === (highlight2.highlight.trim() || '') &&
     (highlight1.type.trim() || '') === (highlight2.type.trim() || '') &&
     (highlight1.page.trim() || '') === (highlight2.page.trim() || '') &&
@@ -72,7 +72,16 @@ function compareHighlights(highlight1, highlight2) {
     highlight2.location &&
     Number(highlight1.location.start) === Number(highlight2.location.start) &&
     Number(highlight1.location.end) === Number(highlight2.location.end)
-  );
+  
+    if(result === true)
+      return result;
+
+    // since it is not a match, we check if the new highlight was taken later in time.
+    // we are here indicates that location is same, type and page are also same.
+    if(highlight1.timestamp && highlight2.timestamp) {
+      return new Date(highlight1.timestamp) > new Date(highlight2.timestamp);
+    }
+
 }
 
 function checkForNewHighlights(highlights, existingHighlightsOnCloud) {
