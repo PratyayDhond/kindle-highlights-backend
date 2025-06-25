@@ -105,15 +105,12 @@ async function saveHighlightsToUserProfile(highlights, userId) {
     let book = await Book.findOne({ userId, title: highlight.name, author: highlight.author });
     if (book) {
       let newHighlightsPresent = checkForNewHighlights(highlight.highlights, book.highlights);
-      // console.log('new highlights present:', newHighlightsPresent, 'for book:', highlight.name, 'for user:', userId);
 
       if(newHighlightsPresent){
         let combinedHighlights = [...book.highlights, ...highlight.highlights];
         book.highlights = purgeOverlappingHighlights(combinedHighlights);
         console.log('Saving Changes for book:', highlight.name, 'for user:', userId);
         savePromises.push(book.save());
-      }else{
-        // console.log('No changes in highlights for book:', highlight.name, 'for user:', userId);
       }
       continue;
     }
@@ -246,6 +243,37 @@ app.get('/user/book/:bookId', authenticate, async (req, res) => {
   res.json({ book });
 });
 
+app.post('/user/upload-highlights-file', authenticate, upload.single('file'), async (req, res) => {
+  const userId = req.user.userId;
+  const file = req.file;
+
+  if (!file) {
+    return res.status(400).json({ message: 'No file uploaded' });
+  }
+
+  const filePath = path.join(__dirname, file.path);
+
+  fs.readFile(filePath, 'utf8', async (err, data) => {
+    // Always delete the uploaded file
+    fs.unlink(filePath, () => {});
+
+    if (err) {
+      return res.status(500).json({ message: 'Error reading file' });
+    }
+
+    const highlights = parseHighlights.parseHighlights(data);
+    if (highlights.status === 'error') {
+      return res.status(highlights.statusCode).json({ message: highlights.message });
+    }
+
+    // Save Highlights for user's profile
+    await saveHighlightsToUserProfile(highlights, userId);
+
+    return res.json({ message: 'Highlights uploaded successfully', highlights });
+  });
+});
+
+
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
 .then(() =>  console.log('MongoDB connected!'))
@@ -268,3 +296,6 @@ app.listen(PORT, () =>  console.log(`Server running on port ${PORT}`));
 
 // #todo 
 // write an api call for uploading a new kindle clippings file and updating the user's profile with the new highlights.without generating highlights zip.
+
+// #todo
+// redundancy removal not working for locations with start = 2000 and no end i.e. end = -1, so when there is single start, we still have to check for the overlap.
