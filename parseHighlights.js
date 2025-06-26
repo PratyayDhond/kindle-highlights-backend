@@ -27,8 +27,9 @@ function parseBookNameAndAuthor(bookNameAndAuthor) {
 
 function parsePageLocationTimestamp(data) {
     var page = '';
-    var location = '';
+    var location = {start: -1, end: -1};
     var timestamp = '';
+    var locationString = '';
     var quoteType = '';
 
     data = data.trimRight();
@@ -46,10 +47,11 @@ function parsePageLocationTimestamp(data) {
     if (locationExists !== -1){
         let i = locationExists + 9; // 9 is the length of "location "
         while (i < data.length && data[i] !== ' ') {
-            location += data[i];    
+            locationString += data[i];    
             i++;
         }
     }
+    location = parseLocation(locationString);
 
     const timestampExists = data.search("Added on")
     if (timestampExists !== -1){
@@ -94,17 +96,19 @@ function createBook(books, bookName, author) {
     books.push(book);
 }
 
-function addUserHighlightInBook(books, bookname, author, highlight, page, location, timestamp, type) {
-    let locObj = parseLocation(location);
+function addUserHighlightInBook(books, bookname, author, highlight, page, location, timestamp, type) {    
     
+    if(highlight === '')
+        return;
+
     const highlightObject = {
         highlight: highlight,
         page: page,
         location: location,
         timestamp: timestamp,
         type: type,
-        locStart: locObj.start,
-        locEnd: locObj.end
+        // locStart: locObj.start,
+        // locEnd: locObj.end
     };
 
     for (var i = 0; i < books.length; i++) {
@@ -130,7 +134,7 @@ function parseHighlights(fileContent) {
     var bookName = '';
     var currentNote = '';
     var page = '';
-    var location = '';
+    var location = {start: undefined, end: undefined};
     var timestamp = '';
     var currentNoteType = '';
     var i = 0;
@@ -153,6 +157,11 @@ function parseHighlights(fileContent) {
         var dataLine2 = rawData[i].trimRight();
         [page, location, timestamp, currentNoteType] = parsePageLocationTimestamp(dataLine2);
 
+        if(currentNoteType === 'unknown' && location.start === -1 && location.end === -1) {
+            console.log('Incorrect file uploaded'); // this is not a valid kindle clippings file
+            // Here we are setting error code to 418 (I'm a teapot) as a playful way to indicate that the file is not a valid Kindle clippings file.
+            return {status: 'error', message: 'Incorrect file uploaded. Please upload a valid Kindle clippings file.', statusCode: 418};
+        }
         i+= 1; // skip the next line which is a separator
         //  console.log("Current Line:", rawData[i]);
         while( i < rawData.length && rawData[i].trim() !== note_sep){
@@ -163,8 +172,6 @@ function parseHighlights(fileContent) {
         if (currentNote.length > 0 && currentNote[currentNote.length - 1] === '\n') {
             currentNote = currentNote.slice(0, -1);
         }
-
-        // Creating Book if not already exists
         
         book = bookExists(books, bookName)
         if(book === -1){
@@ -183,7 +190,16 @@ function parseHighlights(fileContent) {
     setBookCount(books.length);
      console.log('Parsing completed. Total books:', books.length);
      console.log('Total highlights:', totalHighlights);
-    return removeRedundantHighlights(books);
+    let [updatedBooks, updatedTotalHighlights] = removeRedundantHighlights(books);
+
+    let stats = {
+        totalBooks: updatedBooks.length,
+        totalHighlights: updatedTotalHighlights,
+        avgHighlights: updatedTotalHighlights / updatedBooks.length,
+        maxHighlights: Math.max(...updatedBooks.map(book => book.highlights.length)),
+        updatedAt: new Date()
+    }
+    return { highlights: books, stats };
 }
 
 function dataToArray(data) {
@@ -202,92 +218,112 @@ function dataToArray(data) {
 
 
 function parseLocation(location) {
-    if (!location) return { start: 0, end: 0 };
+    if (!location) return { start: -1, end: -1 };
     if (typeof location === 'number') return { start: location, end: location };
     const parts = location.split('-').map(x => parseInt(x.trim(), 10));
     if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        if(parts[0] === parts[1])
+            return { start: parts[0], end: -1 };
         return { start: parts[0], end: parts[1] };
     }
     if (parts.length === 1 && !isNaN(parts[0])) {
-        return { start: parts[0], end: parts[0] };
+        return { start: parts[0], end: -1 }; // end is -1 if only start is provided
     }
-    return { start: 0, end: 0 };
+    console.error(`Invalid location format: ${location}`);
+    return { start: -1, end: -1 };
 }
 
 function purgeOverlappingHighlights(highlights) {
     if (!highlights.length) return [];
-    const solution = [];
+    const updatedHighlights = [];
 
-    // sort highlights by locStart here
-    highlights.sort((a, b) => a.locStart - b.locStart);
+
+    // sort highlights by location.start here
+    highlights.sort((a, b) => {
+      if (a.type !== b.type) {
+        return a.type.localeCompare(b.type);
+      }
+      
+      if (a.location.start !== b.location.start) {
+        return a.location.start - b.location.start;
+      }
+      // Keep notes before highlights if at the same location
+
+      // If still equal, sort by timestamp
+      return new Date(a.timestamp) - new Date(b.timestamp);
+    });
 
     let current = highlights[0];
+
+    // for the edge case that the user has only one highlight in a book.
+    // If this is not done we will end up getting an empty pdf with book name and author but no highlights.
+    if(highlights.length === 1) {
+        updatedHighlights.push(current);
+    }
+
     for (let i = 1; i < highlights.length; i++) {
         const next = highlights[i];
 
-        if(current.type === 'note'){
-            solution.push(current);
-            current = next;
+        // if(current.type === 'note'){
+        //     updatedHighlights.push(current);
+        //     current = next;
+        //     continue;
+        // }
+
+        let currentStart = current.location.start;
+        let currentEnd = current.location.end === -1 ? current.location.start : current.location.end;
+        let nextStart = next.location.start;
+        let nextEnd = next.location.end === -1 ? next.location.start : next.location.end
+
+        if(currentStart === nextStart && currentEnd === nextEnd && current.type === next.type) {
+            let currentTime = new Date(current.timestamp).getTime();
+            let nextTime = new Date(next.timestamp).getTime();
+            if (nextTime >= currentTime) {
+                // If next highlight is more recent, update current and forget about it ;)
+                current = next;
+            }
             continue;
         }
 
-        if (current.locEnd >= next.locStart) { 
-            // notes will be overlapping with highlights and should be saved
+        // if they overlap and are of the same type
+        if (currentEnd >= nextStart && current.type === next.type) {
             // Overlapping or touching intervals, keep the latest one out of the two
             let currentTime = new Date(current.timestamp).getTime();
             let nextTime = new Date(next.timestamp).getTime();
-            if (nextTime > currentTime) {
-                // console.log(current)
+            if (nextTime >= currentTime ) {
                 // If next highlight is more recent, update current and forget about it ;)
                 current = next
             }
             // current.locEnd = Math.max(current.locEnd, next.locEnd);
         } else {
             // No overlap, push the current highlight and move to the next
-            solution.push(current);
+            updatedHighlights.push(current);
             current = next;
         }
+
     }
-    return solution;
+    // compare the current and next one last time
+
+    // updatedHighlights.push(highlights[highlights.length - 1]);
+    updatedHighlights.push(current);
+    return updatedHighlights;
 }
 
 function removeRedundantHighlights(books){
     let totalHighlights = 0;
     books.forEach(book => {
-        // let highlights = book.highlights;
-        // Sort highlights by the start of their location (handles both "824" and "824-835")
-        // highlights.sort((a, b) => a.locStart - b.locStart);
         book.highlights = purgeOverlappingHighlights(book.highlights);
         totalHighlights += book.highlights.length;
-
-        // for(let i = 0; i < highlights.length; i++){
-            // console.log(`location: ${highlights[i].location}, locStart: ${highlights[i].locStart}, locEnd: ${highlights[i].locEnd}`);            
-            // for(let j = i+1; j < highlights.length; j++){
-
-
-                // let simScore = getSimilarityScore(highlights[i].highlight, highlights[j].highlight);
-                // // console.log(`Similarity Score for pair ${i},${j} is ${simScore}`)
-                // let locDiff = Math.abs(highlights[i].location - highlights[j].location);
-                // let pageDiff = Math.abs(highlights[i].page - highlights[j].page);
-                // if(simScore > 0.25 && simScore < 0.40 && (locDiff <= 4 || pageDiff < 1)){
-                //     console.log(highlights[i].highlight)
-                //     console.log(highlights[j].highlight)
-                //     console.log(simScore)
-                //     console.log(".")
-                // }
-
-                // what if we instead cross check the loc on which the highlight was made.
-                // If the highlights have overlapping loc we keep the latest one
-
-                // now compare the i with j and see if they overlap, if they overlap keep the current one and remove the past one from highlights.
-
-
-
-            // }
-        // }
     });
+
+    // for(let i = 0; i < books.length; i++) {
+    //     books[i].highlights = purgeOverlappingHighlights(books[i].highlights);
+    //     totalHighlights += books[i].highlights.length;
+    // }
+
     console.log(`Total highlights after removing redundant ones: ${totalHighlights}`);
-    return books;
+    return [books, totalHighlights];
 }
 
-module.exports = {parseHighlights}
+module.exports = {parseHighlights, purgeOverlappingHighlights}
+
