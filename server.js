@@ -411,3 +411,7 @@ app.listen(PORT, () =>  console.log(`Server running on port ${PORT}`));
 
 // #todo
 // #for stats : When checking for unique quotes, lets just do a n*n instead of trying to save time using overlapping interval, it isn't saving much since we are sorting anyways.
+
+
+// #todo
+// Write a blog on sort, how sort can end up duplicating and destroying values and how it caused a mess for kindle-clippings

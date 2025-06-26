@@ -264,18 +264,18 @@ function purgeOverlappingHighlights(highlights) {
     for (let i = 1; i < highlights.length; i++) {
         const next = highlights[i];
 
-        if(current.type === 'note'){
-            updatedHighlights.push(current);
-            current = next;
-            continue;
-        }
+        // if(current.type === 'note'){
+        //     updatedHighlights.push(current);
+        //     current = next;
+        //     continue;
+        // }
 
         let currentStart = current.location.start;
         let currentEnd = current.location.end === -1 ? current.location.start : current.location.end;
         let nextStart = next.location.start;
         let nextEnd = next.location.end === -1 ? next.location.start : next.location.end
 
-        if(currentStart === nextStart && currentEnd === nextEnd){
+        if(currentStart === nextStart && currentEnd === nextEnd && current.type === next.type) {
             let currentTime = new Date(current.timestamp).getTime();
             let nextTime = new Date(next.timestamp).getTime();
             if (nextTime >= currentTime) {
