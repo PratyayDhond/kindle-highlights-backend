@@ -84,6 +84,8 @@ function compareHighlights(highlight1, highlight2) {
       return new Date(highlight1.timestamp) > new Date(highlight2.timestamp);
     }
 
+    return result;
+
 }
 
 function checkForNewHighlights(highlights, existingHighlightsOnCloud) {
@@ -403,7 +405,7 @@ mongoose.connect(process.env.MONGODB_URI)
 
 app.listen(PORT, () =>  console.log(`Server running on port ${PORT}`));
 
-
+module.exports = {compareHighlights, checkForNewHighlights, saveHighlightsToUserProfile, updateUserStats, app};
 // #todo
 // Uploaded File validation
 

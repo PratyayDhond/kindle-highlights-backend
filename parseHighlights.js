@@ -188,6 +188,9 @@ function parseHighlights(fileContent) {
         }
     }
     setBookCount(books.length);
+    if(books.length === 0 && totalHighlights === 0) {
+        return {status: 'error', message: 'Incorrect file uploaded. Please upload a valid Kindle clippings file.', statusCode: 418};
+    }
      console.log('Parsing completed. Total books:', books.length);
      console.log('Total highlights:', totalHighlights);
     let [updatedBooks, updatedTotalHighlights] = removeRedundantHighlights(books);
@@ -257,9 +260,9 @@ function purgeOverlappingHighlights(highlights) {
 
     // for the edge case that the user has only one highlight in a book.
     // If this is not done we will end up getting an empty pdf with book name and author but no highlights.
-    if(highlights.length === 1) {
-        updatedHighlights.push(current);
-    }
+    // if(highlights.length === 1) {
+    //     updatedHighlights.push(current);
+    // }
 
     for (let i = 1; i < highlights.length; i++) {
         const next = highlights[i];

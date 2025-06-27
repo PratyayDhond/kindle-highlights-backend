@@ -27,5 +27,10 @@
     "multer": "^2.0.1",
     "nodemailer": "^7.0.3",
     "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "chai": "^5.2.0",
+    "mocha": "^11.7.1",
+    "supertest": "^7.1.1"
   }
 }
