@@ -20,19 +20,19 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'; // Set in .env
 const cleanEmail = (email) => {
   const [username, domain] = email.split("@");
   if (domain && domain.toLowerCase() === "gmail.com") {
-    const cleanedUsername = username.split("+")[0].replace(/\./g, "");
+    const cleanedUsername = username.split("+")[0]; // Only remove anything after +
     return `${cleanedUsername}@${domain}`;
   }
   return email;
 };
 
 router.post('/auth/google', async (req, res) => {
-  const { token } = req.body;
-  if (!token) return res.status(400).json({ message: 'No token provided', googleId: null });
+  const googleToken = req.body.token;
+  if (!googleToken) return res.status(400).json({ message: 'No token provided', googleId: null });
 
   try {
     const ticket = await googleClient.verifyIdToken({
-      idToken: token,
+      idToken: googleToken,
       audience: GOOGLE_CLIENT_ID,
     });
     const payload = ticket.getPayload();
@@ -57,17 +57,18 @@ router.post('/auth/google', async (req, res) => {
         googleId: sub,
         verified: true // Google SSO users are considered verified
       });
+    } else if (user && !user.googleId) {
+      // Link Google account to existing user
+      user.googleId = sub;
+      if(user.verified === false)
+        newUser = true; // since we are already here the user opted for Google SSO, so now we have them as verified
+      user.verified = true;
+      await user.save();
     }
 
-    // Code to add option for user to use Google SSO instead of normal signup/login
-    // if(user && user.googleId !== sub) {
-      // user.googleId = sub; // Update Google ID if it has changed
-      // await user.save();
-    // }
-
-    if(user && user.googleId === null)
-      res.status(400).json({ message: 'Google SSO not enabled for this user', googleId: null });
-    else{
+    // if(user && user.googleId === null)
+      // res.status(400).json({ message: 'Google SSO not enabled for this user', googleId: null });
+    // else{
       const token = jwt.sign(
         { userId: user._id, email: user.email },
         JWT_SECRET,
@@ -102,7 +103,7 @@ router.post('/auth/google', async (req, res) => {
           coins: user.coins // or user.coins
         });
       }
-    }
+    // }
   } catch (error) {
     console.error('Google token verification failed:', error);  
     res.status(401).json({ message: 'Invalid Google token', googleId: null });
