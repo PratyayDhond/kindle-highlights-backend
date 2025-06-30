@@ -2,6 +2,9 @@
 
 require('dotenv').config();
 
+const {startCronJob} = require('./cron'); // Import the cron job to keep the server alive
+startCronJob(); // Start the cron job when the server starts
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
