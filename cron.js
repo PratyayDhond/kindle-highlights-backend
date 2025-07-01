@@ -1,8 +1,10 @@
 const cron = require('cron');
 const https = require('https');
-const http = require('http');
+
+const sendNewsletter = require('./utils/sendNewsletter')
 
 const backendUrl = process.env.BACKEND_URL || 'localhost:3000';
+const NEWSLETTER_CRON_STRING = process.env.NEWSLETTER_CRON_STRING || '0 6-23 * * *'; // Default to run every day at 6 AM
 
 function keepAliveWithRetry(url) {
   https.get(url, (res) => {
@@ -16,7 +18,6 @@ function keepAliveWithRetry(url) {
     }
   }).on('error', (err) => {
     console.error('Error keeping server alive:', err.message);
-    // Optionally retry on network errors as well:
     setTimeout(() => keepAliveWithRetry(url), 60 * 1000);
   });
 }
@@ -25,6 +26,13 @@ const job = new cron.CronJob('*/14 * * * *', function () {
   console.log('Keeping Server Alive - cron job running every 14 minutes');
   keepAliveWithRetry(backendUrl);
 });
+
+// const newsletterJob = new cron.CronJob('0 6-23 * * *', function () {
+// for testing purpose
+const newsletterJob = new cron.CronJob(NEWSLETTER_CRON_STRING, function () {
+  console.log('Newsletter cron job triggered.');
+  sendNewsletter();
+}, null, true, 'Asia/Kolkata');
 
 module.exports = {
   job,
@@ -35,5 +43,14 @@ module.exports = {
   stopCronJob: () => {
     job.stop();
     console.log('Cron job stopped');
+  },
+  newsletterJob,
+  startNewsletterJob: () => {
+    newsletterJob.start();
+    console.log('Newsletter cron job started');
+  },
+  stopNewsletterJob: () => {
+    newsletterJob.stop();
+    console.log('Newsletter cron job stopped');
   }
 };

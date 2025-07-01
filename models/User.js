@@ -11,6 +11,8 @@ const userSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
   verificationToken: { type: String, default: undefined }, // undefined as undefined tokens are ignored during javascript serialisation
+  optForNewsletter: { type: Boolean, default: false }, // User opted in for newsletter
+  lastNewsletterSent: { type: Date, default: null }, // Last time the newsletter was sent
 });
 
 module.exports = mongoose.model('User', userSchema);

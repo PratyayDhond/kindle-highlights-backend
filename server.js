@@ -5,6 +5,10 @@ require('dotenv').config();
 const {startCronJob} = require('./cron'); // Import the cron job to keep the server alive
 startCronJob(); // Start the cron job when the server starts
 
+const {startNewsletterJob} = require('./cron'); // Import the cron job to send newsletters
+startNewsletterJob(); // Start the newsletter cron job when the server starts
+
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -20,6 +24,7 @@ const PORT = process.env.PORT || 3000;
 const parseHighlights = require('./parseHighlights.js'); // Import the highlight parsing function
 const {setProgress, deleteProgress, getProgress} = require('./progress.js');
 const { router: authRoutes, authenticate } = require('./auth.js');
+const {router: newsletterRoutes} = require('./newsletter.js'); // Import the newsletter routes
 const User = require('./models/User'); // Adjust path as needed
 const Book = require('./models/Books'); // Adjust path as needed
 const UserStats = require('./models/UserStats'); // Adjust path as needed
@@ -49,6 +54,7 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(authRoutes);
+app.use(newsletterRoutes)
 
 const upload = multer({ dest: 'uploads/' }); // Uploaded files will go here
 
