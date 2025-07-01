@@ -205,17 +205,14 @@ async function updateUserStats(newBook, newHighlights, newMaxHighlights, fallbac
       stats = fallbackStats;
     }
 
-    stats = await UserStats.create(
-      { userId },
-      {
-        totalBooks: Number(stats.totalBooks) || 0,
-        totalHighlights: Number(stats.totalHighlights) || 0,
-        avgHighlights: Number(stats.avgHighlights.toFixed(2)) || 0,
-        maxHighlights: Number(stats.maxHighlights) || 0,
-        updatedAt: new Date()
-      },
-      { upsert: true, new: true }
-    );
+    stats = await UserStats.create({
+      userId,
+      totalBooks: Number(stats.totalBooks) || 0,
+      totalHighlights: Number(stats.totalHighlights) || 0,
+      avgHighlights: Number(stats.avgHighlights.toFixed(2)) || 0,
+      maxHighlights: Number(stats.maxHighlights) || 0,
+      updatedAt: new Date()
+    });
     console.log('User stats updated:', stats);
     return stats;
   } catch (err) {
