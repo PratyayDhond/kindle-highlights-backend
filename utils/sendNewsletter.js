@@ -40,6 +40,8 @@ async function getRandomHighlightsForUser(user) {
             }
             highlightsForNewsletter.push(highlights[randomIndex]);
         }
+
+        highlights.length = 0
     }catch(err) {
         console.error('Error fetching highlights for user:', err);
         return [];
@@ -73,6 +75,12 @@ async function sendNewsletter(){
         try{
         console.log("Sending newsletter to:", user.email);
         const highlights = await getRandomHighlightsForUser(user);
+            if(highlights.length === 0) {
+                console.log(`No highlights found for user ${user.email}. Skipping newsletter.`);
+                // Update user's last newsletter sent date to avoid trying again today
+                user.lastNewsletterSent = new Date(); // Update last sent date
+                continue;
+            }
             const { subject, text, html } = newseletterTemplate({ given_name: user.firstName || 'User', highlights });
             await transporter.sendMail({
                 from: process.env.EMAIL_USER,
@@ -82,7 +90,6 @@ async function sendNewsletter(){
                 html
             });
             // Update user's newsletter status
-            user.newsletterSent = true;
             user.lastNewsletterSent = new Date();
             await user.save();
             console.log(`Newsletter sent to ${user.email}`);

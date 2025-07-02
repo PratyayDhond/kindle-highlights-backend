@@ -11,6 +11,8 @@ function formatDate(ts) {
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 module.exports = function({ given_name, highlights }) {
+
+  let highlightsCount = highlights.length;
   // Prepare plain text highlights
   const highlightsText = highlights.map((h, i) =>
     `\n${i + 1}. "${h.highlight}"` +
@@ -37,7 +39,7 @@ module.exports = function({ given_name, highlights }) {
 
 I am Pratyay, the creator of Kindle Clippings — a project born from my own struggle with managing Kindle highlights.
 
-Here are your 10 highlights for today's newsletter:
+Here are your ${highlightsCount} highlights for today's newsletter:
 
 ${highlightsText}
 
@@ -60,7 +62,7 @@ If you no longer wish to receive these newsletters, please update your preferenc
       <p>Hello ${given_name},</p>
       <p>I am Pratyay, the creator of Kindle Clippings — a project born from my own struggle with managing Kindle highlights.</p>
 
-      <p>Here are your 10 highlights for today's newsletter:</p>
+      <p>Here are your ${highlightsCount} highlights for today's newsletter:</p>
       <p>Happy reading!</p>
       <br>
       ${highlightsHtml}
