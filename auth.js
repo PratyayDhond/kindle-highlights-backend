@@ -91,14 +91,16 @@ router.post('/auth/google', async (req, res) => {
         await sendWelcomeMail({ given_name, email: cleanedEmail });
         res.status(201).json({ 
           message: 'Google login successful, user created', 
-          user, 
+          firstName: user.firstName,
+          email: user.email, 
           googleId: sub,
           coins: user.coins // or user.coins if that's your field
         });
       } else {
         res.status(200).json({ 
           message: 'Google login successful', 
-          user, 
+          firstName: user.firstName,
+          email: user.email, 
           googleId: sub,
           coins: user.coins // or user.coins
         });
@@ -244,7 +246,18 @@ router.get('/protected', authenticate, (req, res) => {
 
 router.get('/auth/me', authenticate, (req, res) => {
   // req.user is set by the authenticate middleware
-  res.status(200).json({ user: req.user });
+  res.status(200).json({ userId: req.user.userId });
+});
+
+router.post('/auth/user', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select('firstName email')
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.status(200).json(user);
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
 });
 
 module.exports = {
