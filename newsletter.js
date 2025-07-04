@@ -23,9 +23,9 @@ router.post('/newsletter/subscribe', authenticate, async (req, res) => {
         console.error("User already subscribed to newsletter for ID:", userId);
         return res.status(400).json({ message: 'User already subscribed to newsletter' });
     }
-
     user.optForNewsletter = true;
     await user.save();
+    console.log(`User with ID: ${userId} subscribed to the newsletter`);
     res.status(200).json({ message: 'Subscribed to newsletter successfully' });
   } catch (error) {
     console.error('Error subscribing to newsletter:', error);

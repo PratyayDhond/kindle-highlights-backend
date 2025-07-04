@@ -210,14 +210,14 @@ function dataToArray(data) {
 }
 
 // a function to return similarity scores between two texts
-// function getSimilarityScore(text1, text2){
-//     const set1 = new Set(text1.toLowerCase().split(/\s+/));
-//     const set2 = new Set(text2.toLowerCase().split(/\s+/));
-//     const intersection = new Set([...set1].filter(x => set2.has(x)));
-//     const union = new Set([...set1, ...set2]);
-//     if (union.size === 0) return 0;
-//     return intersection.size / union.size;
-// }
+function getSimilarityScore(text1, text2){
+    const set1 = new Set(text1.toLowerCase().split(/\s+/));
+    const set2 = new Set(text2.toLowerCase().split(/\s+/));
+    const intersection = new Set([...set1].filter(x => set2.has(x)));
+    const union = new Set([...set1, ...set2]);
+    if (union.size === 0) return 0;
+    return intersection.size / union.size;
+}
 
 
 function parseLocation(location) {
@@ -236,6 +236,31 @@ function parseLocation(location) {
     return { start: -1, end: -1 };
 }
 
+var simScoreCount = 0;
+
+function areHighlightsSimilar(highlight1, highlight2) {
+    // Check if both highlights are empty or undefined
+    if (!highlight1 || !highlight2) return false;
+    if (highlight1.trim() === '' && highlight2.trim() === '') return true;
+    // Check if both highlights are exactly the same
+    if (highlight1 === highlight2) return true;
+
+    // check if one of the highlights is a substring of the other
+    if (highlight1.includes(highlight2) || highlight2.includes(highlight1))
+        return true;
+
+    // Calculate similarity score
+    const similarityScore = getSimilarityScore(highlight1, highlight2);
+    // Define a threshold for similarity (e.g., 0.8 means 80% similarity)
+    const threshold = process.env.SIMILARITY_THRESHOLD || 0.7;
+    if(similarityScore >= threshold) {
+        console.log(`Highlights are similar: ${highlight1} | ${highlight2} | Score: ${similarityScore}`);
+        simScoreCount++;
+    }
+    // Return true if the similarity score is above the threshold
+    return similarityScore >= threshold;
+}
+
 function purgeOverlappingHighlights(highlights) {
     if (!highlights.length) return [];
     const updatedHighlights = [];
@@ -246,7 +271,7 @@ function purgeOverlappingHighlights(highlights) {
       if (a.type !== b.type) {
         return a.type.localeCompare(b.type);
       }
-      
+
       if (a.location.start !== b.location.start) {
         return a.location.start - b.location.start;
       }
@@ -278,7 +303,7 @@ function purgeOverlappingHighlights(highlights) {
         let nextStart = next.location.start;
         let nextEnd = next.location.end === -1 ? next.location.start : next.location.end
 
-        if(currentStart === nextStart && currentEnd === nextEnd && current.type === next.type) {
+        if(currentStart === nextStart && currentEnd === nextEnd && current.type === next.type && areHighlightsSimilar(current.highlight, next.highlight)) {
             let currentTime = new Date(current.timestamp).getTime();
             let nextTime = new Date(next.timestamp).getTime();
             if (nextTime >= currentTime) {
@@ -289,13 +314,13 @@ function purgeOverlappingHighlights(highlights) {
         }
 
         // if they overlap and are of the same type
-        if (currentEnd >= nextStart && current.type === next.type) {
+        if (currentEnd >= nextStart && current.type === next.type && areHighlightsSimilar(current.highlight, next.highlight)) {
             // Overlapping or touching intervals, keep the latest one out of the two
             let currentTime = new Date(current.timestamp).getTime();
             let nextTime = new Date(next.timestamp).getTime();
             if (nextTime >= currentTime ) {
                 // If next highlight is more recent, update current and forget about it ;)
-                current = next
+                current = next;
             }
             // current.locEnd = Math.max(current.locEnd, next.locEnd);
         } else {
@@ -325,6 +350,7 @@ function removeRedundantHighlights(books){
     // }
 
     console.log(`Total highlights after removing redundant ones: ${totalHighlights}`);
+    console.log(simScoreCount, "similar highlights found");
     return [books, totalHighlights];
 }
 
