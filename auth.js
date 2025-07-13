@@ -15,15 +15,25 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'; // Set in .env
 
-// currently only supports gmail.com emails
-// Add support for other email providers
-const cleanEmail = (email) => {
-  const [username, domain] = email.split("@");
-  if (domain && domain.toLowerCase() === "gmail.com") {
-    const cleanedUsername = username.split("+")[0]; // Only remove anything after +
-    return `${cleanedUsername}@${domain}`;
+// Remove plus addressing (+alias) from emails to prevent duplicate accounts
+// This is supported by most modern email providers (Gmail, Outlook, Yahoo, etc.)
+function cleanEmail(email) {
+  if (!email || !email.includes('@')) {
+    return null;
   }
-  return email;
+  
+  const [username, domain] = email.split('@');
+  if (!username || !domain) {
+    return null;
+  }
+  
+  if (email.split('@').length > 2) {
+    return null;
+  }
+
+  const cleanedUsername = username.split('+')[0];
+  
+  return `${cleanedUsername}@${domain.toLowerCase()}`;
 };
 
 router.post('/auth/google', async (req, res) => {
@@ -112,6 +122,34 @@ router.post('/auth/google', async (req, res) => {
   }
 });
 
+router.post('/auth/deleteUser', async (req,res) => {
+  const {email, password} = req.body;
+  if(!email || !password)
+      return res.status(400).json({message: 'All fields are required'});
+  let cleanedEmail = cleanEmail(email);
+  if(!cleanedEmail)
+      return res.status(400).json({message: 'Invalid email'});
+  console.log(cleanedEmail)
+  try{
+    let user = await User.findOne({email: cleanedEmail});
+    if(!user)
+        return res.status(404).json({message: 'User not found'});
+
+    // bcrypt internally extracts salt from passwordHash, uses it on password and compares
+    const match = await bcrypt.compare(password, user.passwordHash);
+
+    if(!match)
+      return res.status(401).json({message: 'Incorrect password'});
+
+    await User.findByIdAndDelete(user._id);
+    
+    res.status(200).json({message: 'User deleted successfully'});
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({message: 'Internal server error'});
+  }
+});
+
 router.post('/auth/signup', async (req, res) => {
   const { email, firstName, lastName, password } = req.body;
   if (!email || !firstName || !lastName || !password)
@@ -125,7 +163,7 @@ router.post('/auth/signup', async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const verificationToken = crypto.randomBytes(32).toString('hex');
-     console.log(email, firstName, lastName, password);
+    //  console.log(email, firstName, lastName, password);
     
     user = await User.create({
       email: cleanedEmail,
@@ -149,7 +187,7 @@ router.post('/auth/signup', async (req, res) => {
     });
      console.log("Verification email sent to:", cleanedEmail);
      console.log("Verification link:", verificationUrl);
-    res.status(200).json({ message: 'Signup successful, verification email sent' });
+    res.status(201).json({ message: 'Signup successful, verification email sent' });
   } catch (error) {
     console.error('Signup error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -262,7 +300,8 @@ router.post('/auth/user', authenticate, async (req, res) => {
 
 module.exports = {
   router,
-  authenticate
+  authenticate,
+  cleanEmail
 };
 
 

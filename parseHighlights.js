@@ -304,7 +304,7 @@ function purgeOverlappingHighlights(highlights) {
         let nextEnd = next.location.end === -1 ? next.location.start : next.location.end
 
         // here we do not need to check for similarity score
-        // As the start and end are same and not just overlapping, they are the same highlights redone over a span of time.
+        // As the start and end are same and not just overlapping, they are the same highlights redone over a span of time.n
         if(currentStart === nextStart && currentEnd === nextEnd && current.type === next.type) {
             let currentTime = new Date(current.timestamp).getTime();
             let nextTime = new Date(next.timestamp).getTime();
