@@ -25,7 +25,7 @@ function parseBookNameAndAuthor(bookNameAndAuthor) {
     return [bookName.trim(),author.trim()];
 }
 
-function parsePageLocationTimestamp(data) {
+function parsePageLocationTimestampHighlightType(data) {
     var page = '';
     var location = {start: -1, end: -1};
     var timestamp = '';
@@ -105,7 +105,9 @@ function addUserHighlightInBook(books, bookname, author, highlight, page, locati
         highlight: highlight,
         page: page,
         location: location,
-        timestamp: timestamp,
+        timestamp: timestamp, // To be deprecated when knowledge_begin_date is used globally
+        knowledge_begin_date: new Date(timestamp), // Assuming timestamp is in a valid format
+        knowledge_end_date: null, // Initially set to null
         type: type,
         // locStart: locObj.start,
         // locEnd: locObj.end
@@ -155,7 +157,7 @@ function parseHighlights(fileContent) {
 
         // timestamp and location data
         var dataLine2 = rawData[i].trimRight();
-        [page, location, timestamp, currentNoteType] = parsePageLocationTimestamp(dataLine2);
+        [page, location, timestamp, currentNoteType] = parsePageLocationTimestampHighlightType(dataLine2);
 
         if(currentNoteType === 'unknown' && location.start === -1 && location.end === -1) {
             console.log('Incorrect file uploaded'); // this is not a valid kindle clippings file

@@ -26,7 +26,9 @@ async function getRandomHighlightsForUser(user) {
                         bookTitle: book.title,
                         author: book.author,
                         location: highlight.location,
-                        timestamp: highlight.timestamp
+                        timestamp: highlight.timestamp,
+                        knowledge_begin_date: highlight.knowledge_begin_date,
+                        knowledge_end_date: highlight.knowledge_end_date
                     });
                 });
             }

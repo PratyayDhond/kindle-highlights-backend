@@ -8,7 +8,6 @@ startCronJob(); // Start the cron job when the server starts
 const {startNewsletterJob} = require('./cron'); // Import the cron job to send newsletters
 startNewsletterJob(); // Start the newsletter cron job when the server starts
 
-
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -433,3 +432,71 @@ module.exports = {compareHighlights, checkForNewHighlights, saveHighlightsToUser
 
 // #todo
 // Write a blog on sort, how sort can end up duplicating and destroying values and how it caused a mess for kindle-clippings
+
+const Books = require('./models/Books');
+
+async function migrateHighlightKnowledgeDates() {
+  try {
+    console.log('Starting knowledge dates migration for highlights...');
+    
+    const books = await Books.find({ highlights: { $exists: true, $ne: [] } });
+    let totalUpdated = 0;
+
+    for (const book of books) {
+      let modified = false;
+      
+      for (let i = 0; i < book.highlights.length; i++) {
+        const highlight = book.highlights[i];
+        if (!highlight.knowledge_begin_date) {
+          // Use set() to explicitly set the field
+          book.highlights[i].set('knowledge_begin_date', highlight.timestamp || new Date());
+          book.highlights[i].set('knowledge_end_date', null);
+          totalUpdated++;
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        book.markModified('highlights');
+        await book.save();
+      }
+    }
+
+    console.log(`Migration completed! Updated ${totalUpdated} highlights across ${books.length} books`);
+    return { success: true, totalUpdated, booksProcessed: books.length };
+    
+  } catch (error) {
+    console.error('Migration error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Add API endpoint to trigger migration (optional)
+app.post('/admin/migrate-highlight-knowledge-dates', async (req, res) => {
+  const result = await migrateHighlightKnowledgeDates();
+  if (result.success) {
+    res.json({ 
+      message: 'Migration completed successfully', 
+      totalUpdated: result.totalUpdated,
+      booksProcessed: result.booksProcessed
+    });
+  } else {
+    res.status(500).json({ message: 'Migration failed', error: result.error });
+  }
+});
+
+// Uncomment this line to run migration on server start (ONE TIME ONLY)
+// migrateHighlightKnowledgeDates();
+
+
+
+// // Run following command once on deployment to sanitize user highlights to follow updated bitemporal schema
+// fetch('http://localhost:3000/admin/migrate-highlight-knowledge-dates', {
+//   method: 'POST',
+//   headers: {
+//     'Content-Type': 'application/json'
+//   }
+// })
+// .then(response => response.json())
+// .then(data => console.log('Migration result:', data))
+// .catch(error => console.error('Error:', error));

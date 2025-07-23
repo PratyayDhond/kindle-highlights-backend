@@ -23,6 +23,8 @@ const BookSchema = new mongoose.Schema({
       end: {type: Number, required: true} // End location in the book
     },
     timestamp: { type: Date }, // Store timestamp as a Date
+    knowledge_begin_date: { type: Date, default: null }, // Date when the knowledge was created
+    knowledge_end_date: { type: Date, default: null , required: false} // Date when the knowledge was last updated
   }],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
