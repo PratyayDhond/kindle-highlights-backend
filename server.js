@@ -24,6 +24,7 @@ const parseHighlights = require('./parseHighlights.js'); // Import the highlight
 const {setProgress, deleteProgress, getProgress} = require('./progress.js');
 const { router: authRoutes, authenticate } = require('./auth.js');
 const {router: newsletterRoutes} = require('./newsletter.js'); // Import the newsletter routes
+const bookHighlightsRouter = require('./bookHighlights'); // Import the book highlights router
 const User = require('./models/User'); // Adjust path as needed
 const Book = require('./models/Books'); // Adjust path as needed
 const UserStats = require('./models/UserStats'); // Adjust path as needed
@@ -53,8 +54,8 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(authRoutes);
-app.use(newsletterRoutes)
-
+app.use(newsletterRoutes);
+app.use(bookHighlightsRouter);
 const upload = multer({ dest: 'uploads/' }); // Uploaded files will go here
 
 const PROCESSING_FEE_PER_BOOK = process.env.PROCESSING_FEE_PER_BOOK || 1; // Set your fee
@@ -500,3 +501,19 @@ app.post('/admin/migrate-highlight-knowledge-dates', async (req, res) => {
 // .then(response => response.json())
 // .then(data => console.log('Migration result:', data))
 // .catch(error => console.error('Error:', error));
+
+
+// Ensure when running the command to replace the fetch url with backend url not frontend kindle-clippings.pages.dev
+// fetch('https://kindle-highlights-backend.onrender.com/admin/migrate-highlight-knowledge-dates', {
+//   method: 'POST',  // Make sure this is POST, not GET
+//   headers: {
+//     'Content-Type': 'application/json'
+//   }
+// })
+// .then(response => {
+//   console.log('Status:', response.status);
+//   return response.json();
+// })
+// .then(data => console.log('Migration result:', data))
+// .catch(error => console.error('Error:', error));
+
