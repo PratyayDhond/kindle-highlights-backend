@@ -24,7 +24,7 @@ const BookSchema = new mongoose.Schema({
     },
     timestamp: { type: Date }, // Store timestamp as a Date
     knowledge_begin_date: { type: Date, default: null }, // Date when the knowledge was created
-    knowledge_end_date: { type: Date, default: null , required: false} // Date when the knowledge was last updated
+    knowledge_end_date: { type: Date || null, default: null , required: false} // Date when the knowledge was last updated
   }],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
