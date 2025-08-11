@@ -12,7 +12,7 @@ const SoftDeletedBooksSchema = new mongoose.Schema({
     required: true 
   },
   title: { type: String, required: true },
-  author: { type: String, required: true },
+  author: { type: String  , required: false, default: null }, // Author can be null for custom documents
   deletedHighlights: [{
     originalHighlightId: { 
       type: mongoose.Schema.Types.ObjectId, 

@@ -96,25 +96,22 @@ router.post('/auth/google', async (req, res) => {
       // This allows the server to recognize the user in future requests and maintain their session.
       // This is particularly useful for Single Sign-On (SSO) scenarios like Google login, where the user is authenticated via Google and the server needs to maintain that session.
 
-
+      let message = 'Google login successful';
+      let statusCode = 200;
       if(newUser) {
         await sendWelcomeMail({ given_name, email: cleanedEmail });
-        res.status(201).json({ 
-          message: 'Google login successful, user created', 
-          firstName: user.firstName,
-          email: user.email, 
-          googleId: sub,
-          coins: user.coins // or user.coins if that's your field
-        });
-      } else {
-        res.status(200).json({ 
-          message: 'Google login successful', 
-          firstName: user.firstName,
-          email: user.email, 
-          googleId: sub,
-          coins: user.coins // or user.coins
-        });
+        message = 'Google login successful, user created';
+        statusCode = 201;
       }
+
+      res.status(statusCode).json({ 
+        message: message, 
+        firstName: user.firstName,
+        email: user.email, 
+        googleId: sub,
+        id: user._id,
+        coins: user.coins // or user.coins
+      });
     // }
   } catch (error) {
     console.error('Google token verification failed:', error);  
