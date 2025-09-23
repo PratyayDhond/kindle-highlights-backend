@@ -13,6 +13,13 @@ const userSchema = new mongoose.Schema({
   verificationToken: { type: String, default: undefined }, // undefined as undefined tokens are ignored during javascript serialisation
   optForNewsletter: { type: Boolean, default: false }, // User opted in for newsletter
   lastNewsletterSent: { type: Date, default: null }, // Last time the newsletter was sent
+  kindleSecretKey: { 
+    type: String, 
+    unique: true, 
+    sparse: true // Allow null values but ensure uniqueness when present
+  },
+  kindleSecretKeyCreatedAt: { type: Date },
+  kindleSecretKeyLastUsed: { type: Date },
 });
 
 module.exports = mongoose.model('User', userSchema);

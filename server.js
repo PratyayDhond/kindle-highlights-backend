@@ -17,6 +17,9 @@ const path = require('path');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid'); // npm install uuid
 const mongoose = require('mongoose');
+const crypto = require('crypto');
+const rateLimit = require('express-rate-limit'); // Import express-rate-limit
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 // const SECRET = 'supersecret';
@@ -400,6 +403,83 @@ app.get('/user/stats', authenticate, async (req, res) => {
   res.json({ stats });
 });
 
+// Generate secret key for authenticated user
+app.post('/user/generate-kindle-secret', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+
+    // Generate a secure random secret key
+    const secretKey = crypto.randomBytes(32).toString('hex');
+    
+    user.kindleSecretKey = secretKey;
+    user.kindleSecretKeyCreatedAt = new Date();
+    await user.save();
+
+    res.json({ 
+      message: 'Secret key generated successfully',
+      secretKey: secretKey,
+      userId: userId
+    });
+
+  } catch (error) {
+    console.error('Error generating secret key:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Get existing secret key for authenticated user
+app.get('/user/kindle-secret', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+
+    if (!user.kindleSecretKey) {
+      return res.status(404).json({ message: 'No secret key found. Generate one first.' });
+    }
+
+    res.json({ 
+      secretKey: user.kindleSecretKey,
+      createdAt: user.kindleSecretKeyCreatedAt,
+      lastUsed: user.kindleSecretKeyLastUsed
+    });
+
+  } catch (error) {
+    console.error('Error fetching secret key:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Revoke secret key for authenticated user
+app.delete('/user/kindle-secret', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+
+    user.kindleSecretKey = null;
+    user.kindleSecretKeyCreatedAt = null;
+    user.kindleSecretKeyLastUsed = null;
+    await user.save();
+
+    res.json({ message: 'Secret key revoked successfully' });
+
+  } catch (error) {
+    console.error('Error revoking secret key:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
@@ -411,7 +491,42 @@ mongoose.connect(process.env.MONGODB_URI)
 
 app.listen(PORT, () =>  console.log(`Server running on port ${PORT}`));
 
-module.exports = {compareHighlights, checkForNewHighlights, saveHighlightsToUserProfile, updateUserStats, app};
+// Create a custom rate limiter for Kindle endpoints
+const kindleRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 10, // limit each IP to 10 requests per windowMs
+  message: {
+    error: 'Too many requests from this IP for Kindle endpoints. Please try again in 10 minutes.',
+    retryAfter: '10 minutes'
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  // Only apply to Kindle endpoints
+  skip: (req) => !req.path.startsWith('/kindle/'),
+});
+
+// Custom CORS middleware specifically for Kindle endpoints
+const kindleCors = (req, res, next) => {
+  if (req.path.startsWith('/kindle/')) {
+    // Allow requests from any origin for Kindle endpoints
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+  }
+  next();
+};
+
+// Apply the custom CORS middleware before your existing CORS
+app.use(kindleCors);
+
+// Apply rate limiting to all Kindle endpoints
+app.use('/kindle', kindleRateLimit);
+
 // #todo
 // Uploaded File validation
 
@@ -517,3 +632,179 @@ app.post('/admin/migrate-highlight-knowledge-dates', async (req, res) => {
 // .then(data => console.log('Migration result:', data))
 // .catch(error => console.error('Error:', error));
 
+const uploadKindle = multer({ 
+  dest: 'uploads/',
+  fileFilter: (req, file, cb) => {
+    // Only accept .txt files
+    if (file.mimetype === 'text/plain' || file.originalname.endsWith('.txt')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only .txt files are allowed'), false);
+    }
+  }
+}).fields([
+  { name: 'file', maxCount: 1 },
+  { name: 'userId', maxCount: 1 },
+  { name: 'secretKey', maxCount: 1 }
+]);
+
+// New API endpoint for Kindle direct upload
+app.post('/kindle/upload-clippings', uploadKindle, async (req, res) => {
+  try {
+    const { secretKey, userId } = req.body;
+    const file = req.files?.file?.[0]; // File is in files.file array
+
+    console.log('Kindle upload attempt - UserId:', userId, 'SecretKey present:', secretKey !== null);
+
+    // Validate required fields
+    if (!secretKey || !userId) {
+      return res.status(400).json({ 
+        message: 'Secret key and user ID are required',
+        required: ['secretKey', 'userId']
+      });
+    }
+
+    if (!file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    // Validate user and secret key
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid user ID' });
+    }
+
+    if (!user.kindleSecretKey || user.kindleSecretKey !== secretKey) {
+      return res.status(401).json({ message: 'Invalid secret key' });
+    }
+
+    // Update last used timestamp
+    user.kindleSecretKeyLastUsed = new Date();
+    await user.save();
+
+    const filePath = path.join(__dirname, file.path);
+
+    fs.readFile(filePath, 'utf8', async (err, data) => {
+      // Always delete the uploaded file
+      fs.unlink(filePath, (unlinkErr) => {
+        if (unlinkErr) console.error('Error deleting file:', unlinkErr);
+      });
+
+      if (err) {
+        console.error('Error reading file:', err);
+        return res.status(500).json({ message: 'Error reading uploaded file' });
+      }
+
+      try {
+        // Parse highlights
+        const highlightsData = parseHighlights.parseHighlights(data);
+        const highlights = highlightsData.highlights;
+        
+        if (highlightsData.status === 'error') {
+          return res.status(highlightsData.statusCode).json({ 
+            message: highlightsData.message 
+          });
+        }
+
+        console.log(`Kindle upload: ${highlights.length} books found`);
+        
+        // Calculate processing fee
+        const uniqueBooks = highlights.length;
+        const totalFee = uniqueBooks * PROCESSING_FEE_PER_BOOK;
+        
+        console.log(`Kindle upload: Total fee ${totalFee} for ${uniqueBooks} books`);
+        
+        if (user.coins < totalFee) {
+          return res.status(402).json({ 
+            message: `Insufficient coins. Need ${totalFee} coins for ${uniqueBooks} books. Current balance: ${user.coins}`,
+            required: totalFee,
+            current: user.coins,
+            shortfall: totalFee - user.coins
+          });
+        }
+
+        // Save highlights to user profile
+        const [newBooks, newHighlights] = await saveHighlightsToUserProfile(highlights, userId);
+        const maxHighlights = Math.max(...highlights.map(book => book.highlights.length));
+        
+        // Update user stats
+        const stats = await updateUserStats(newBooks, newHighlights, maxHighlights, highlightsData.stats, userId);
+        
+        if (stats && stats.updatedAt) {
+          user.updatedAt = stats.updatedAt;
+        }
+
+        // Charge user
+        user.coins -= totalFee;
+        await user.save();
+
+        console.log(`Kindle upload successful for user ${userId}: ${newBooks} new books, ${newHighlights} new highlights`);
+
+        return res.json({
+          success: true,
+          message: `Upload successful! Processed ${uniqueBooks} books. Charged ${totalFee} coins.`,
+          summary: {
+            totalBooks: uniqueBooks,
+            newBooks: newBooks,
+            newHighlights: newHighlights,
+            coinsCharged: totalFee,
+            remainingCoins: user.coins
+          },
+          stats: stats
+        });
+
+      } catch (processingError) {
+        console.error('Error processing highlights:', processingError);
+        return res.status(500).json({ 
+          message: 'Error processing highlights file',
+          error: processingError.message 
+        });
+      }
+    });
+
+  } catch (error) {
+    console.error('Kindle upload error:', error);
+    res.status(500).json({ 
+      message: 'Internal server error during upload',
+      error: error.message 
+    });
+  }
+});
+
+// Health check endpoint specifically for Kindle
+app.get('/kindle/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    service: 'kindle-upload',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Test endpoint to verify secret key without uploading
+app.post('/kindle/verify-auth', async (req, res) => {
+  try {
+    const { secretKey, userId } = req.body;
+
+    if (!secretKey || !userId) {
+      return res.status(400).json({ message: 'Secret key and user ID required' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user || !user.kindleSecretKey || user.kindleSecretKey !== secretKey) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    res.json({ 
+      message: 'Authentication successful',
+      user: {
+        email: user.email,
+        coins: user.coins,
+        secretKeyCreated: user.kindleSecretKeyCreatedAt
+      }
+    });
+
+  } catch (error) {
+    console.error('Kindle auth verification error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});

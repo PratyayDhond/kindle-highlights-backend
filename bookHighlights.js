@@ -153,7 +153,7 @@ async function moveHighlightToSoftDeleted(book, highlightToDelete, deletionReaso
         originalBookId: book._id,
         userId: book.userId,
         title: book.title,
-        author: book.author,
+        author: book.author || null,
         deletedHighlights: []
       });
     }
