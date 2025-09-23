@@ -18,6 +18,8 @@ const multer = require('multer');
 const { v4: uuidv4 } = require('uuid'); // npm install uuid
 const mongoose = require('mongoose');
 const crypto = require('crypto');
+const rateLimit = require('express-rate-limit'); // Import express-rate-limit
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 // const SECRET = 'supersecret';
@@ -489,7 +491,42 @@ mongoose.connect(process.env.MONGODB_URI)
 
 app.listen(PORT, () =>  console.log(`Server running on port ${PORT}`));
 
-module.exports = {compareHighlights, checkForNewHighlights, saveHighlightsToUserProfile, updateUserStats, app};
+// Create a custom rate limiter for Kindle endpoints
+const kindleRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 10, // limit each IP to 10 requests per windowMs
+  message: {
+    error: 'Too many requests from this IP for Kindle endpoints. Please try again in 10 minutes.',
+    retryAfter: '10 minutes'
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  // Only apply to Kindle endpoints
+  skip: (req) => !req.path.startsWith('/kindle/'),
+});
+
+// Custom CORS middleware specifically for Kindle endpoints
+const kindleCors = (req, res, next) => {
+  if (req.path.startsWith('/kindle/')) {
+    // Allow requests from any origin for Kindle endpoints
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+  }
+  next();
+};
+
+// Apply the custom CORS middleware before your existing CORS
+app.use(kindleCors);
+
+// Apply rate limiting to all Kindle endpoints
+app.use('/kindle', kindleRateLimit);
+
 // #todo
 // Uploaded File validation
 
