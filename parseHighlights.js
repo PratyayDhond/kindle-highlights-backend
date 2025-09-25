@@ -310,7 +310,7 @@ function purgeOverlappingHighlights(highlights) {
 
 
         let currentStart = current.location.start;
-        if(currentStart === -1 && parseInt(current.page) !== NaN){ {
+        if(currentStart === -1 && parseInt(current.page) !== NaN) {
             updatedHighlights.push(current);
             continue; // if start is -1 it is from KOREADER - Jailbroken kindle, skip comparing.
         }
