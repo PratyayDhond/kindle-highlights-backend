@@ -61,17 +61,17 @@ function parsePageLocationTimestampHighlightType(data) {
             i++;
         }
     }
-    
-    if( data.search("Your Note on") !== -1) {
+
+    if( data.search("Your Note on") !== -1 &&
+         data.search("Your note on") !== -1) {
         quoteType = 'note';
     }
-    else if( data.search("Your Highlight on") !== -1 ) {
+    else if( data.search("Your Highlight on") !== -1 
+        && data.search("Your highlight on") !== -1 ) {
         quoteType = 'highlight';
     }
-    else if(data.search("Your highlight on") !== -1) {
-        quoteType = 'highlight';
-    }
-    else if( data.search("Your Bookmark on") !== -1) {
+    else if( data.search("Your Bookmark on") !== -1
+        && data.search("Your bookmark on") !== -1 ) {
         quoteType = 'bookmark';
     }
     else {
@@ -307,7 +307,13 @@ function purgeOverlappingHighlights(highlights) {
         //     continue;
         // }
 
+
+
         let currentStart = current.location.start;
+        if(currentStart === -1 && parseInt(current.page).isNaN() === false) {
+            updatedHighlights.push(current);
+            continue; // if start is -1 it is from KOREADER - Jailbroken kindle, skip comparing.
+        }
         let currentEnd = current.location.end === -1 ? current.location.start : current.location.end;
         let nextStart = next.location.start;
         let nextEnd = next.location.end === -1 ? next.location.start : next.location.end
