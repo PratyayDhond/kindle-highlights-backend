@@ -61,6 +61,7 @@ app.use(newsletterRoutes);
 app.use(bookHighlightsRouter);
 const upload = multer({ dest: 'uploads/' }); // Uploaded files will go here
 
+const KINDLE_FEE_MULTIPLIER = process.env.KINDLE_FEE_MULTIPLIER || 0; // Default to 1 if not set
 const PROCESSING_FEE_PER_BOOK = process.env.PROCESSING_FEE_PER_BOOK || 1; // Set your fee
 const DOWNLOAD_FEE_FOR_HIGHLIGHTS = process.env.DOWNLOAD_FEE_FOR_HIGHLIGHTS || 1; // Default to 1 if not set
 const DOWNLOAD_FEE_FOR_SINGLE_BOOK = process.env.DOWNLOAD_FEE_FOR_SINGLE_BOOK || 3; // Default to 3 if not set
@@ -649,6 +650,8 @@ const uploadKindle = multer({
 ]);
 
 // New API endpoint for Kindle direct upload
+// Currently setting the cost of Direct uploads via Kindle to 0 coins.
+// This may be changed in future to a nominal fee if required.
 app.post('/kindle/upload-clippings', uploadKindle, async (req, res) => {
   try {
     const { secretKey, userId } = req.body;
@@ -709,10 +712,11 @@ app.post('/kindle/upload-clippings', uploadKindle, async (req, res) => {
         console.log(`Kindle upload: ${highlights.length} books found`);
         
         // Calculate processing fee
+
         const uniqueBooks = highlights.length;
-        const totalFee = uniqueBooks * PROCESSING_FEE_PER_BOOK;
-        
-        console.log(`Kindle upload: Total fee ${totalFee} for ${uniqueBooks} books`);
+        const totalFee = uniqueBooks * PROCESSING_FEE_PER_BOOK * KINDLE_FEE_MULTIPLIER;
+
+        console.log(`Kindle upload: Total fee ${totalFee} for ${uniqueBooks} books (Kindle Upload Discount Applied).`);
         
         if (user.coins < totalFee) {
           return res.status(402).json({ 
