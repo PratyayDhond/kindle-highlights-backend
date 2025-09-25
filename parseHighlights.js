@@ -62,16 +62,16 @@ function parsePageLocationTimestampHighlightType(data) {
         }
     }
 
-    if( data.search("Your Note on") !== -1 &&
-         data.search("Your note on") !== -1) {
+    if( data.search("Your Note on") !== -1 ||
+            data.search("Your note on") !== -1) {
         quoteType = 'note';
     }
-    else if( data.search("Your Highlight on") !== -1 
-        && data.search("Your highlight on") !== -1 ) {
+    else if( data.search("Your Highlight on") !== -1 ||
+            data.search("Your highlight on") !== -1 ) {
         quoteType = 'highlight';
     }
-    else if( data.search("Your Bookmark on") !== -1
-        && data.search("Your bookmark on") !== -1 ) {
+    else if( data.search("Your Bookmark on") !== -1 ||
+            data.search("Your bookmark on") !== -1 ) {
         quoteType = 'bookmark';
     }
     else {
