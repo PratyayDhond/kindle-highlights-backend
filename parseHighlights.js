@@ -65,7 +65,10 @@ function parsePageLocationTimestampHighlightType(data) {
     if( data.search("Your Note on") !== -1) {
         quoteType = 'note';
     }
-    else if( data.search("Your Highlight on") !== -1) {
+    else if( data.search("Your Highlight on") !== -1 ) {
+        quoteType = 'highlight';
+    }
+    else if(data.search("Your highlight on") !== -1) {
         quoteType = 'highlight';
     }
     else if( data.search("Your Bookmark on") !== -1) {
@@ -159,7 +162,7 @@ function parseHighlights(fileContent) {
         var dataLine2 = rawData[i].trimRight();
         [page, location, timestamp, currentNoteType] = parsePageLocationTimestampHighlightType(dataLine2);
 
-        if(currentNoteType === 'unknown' && location.start === -1 && location.end === -1) {
+        if(currentNoteType === 'unknown' && location.start === -1 && location.end === -1 && page === '') {
             console.log('Incorrect file uploaded'); // this is not a valid kindle clippings file
             // Here we are setting error code to 418 (I'm a teapot) as a playful way to indicate that the file is not a valid Kindle clippings file.
             return {status: 'error', message: 'Incorrect file uploaded. Please upload a valid Kindle clippings file.', statusCode: 418};
@@ -277,7 +280,11 @@ function purgeOverlappingHighlights(highlights) {
       if (a.location.start !== b.location.start) {
         return a.location.start - b.location.start;
       }
-      // Keep notes before highlights if at the same location
+
+      if (a.page && b.page && parseInt(a.page) !== parseInt(b.page)) {
+        // Keep notes before highlights if at the same location
+        return parseInt(a.page) - parseInt(b.page);
+      }
 
       // If still equal, sort by timestamp
       return new Date(a.timestamp) - new Date(b.timestamp);
