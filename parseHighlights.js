@@ -266,6 +266,19 @@ function areHighlightsSimilar(highlight1, highlight2) {
     return similarityScore >= threshold;
 }
 
+function compareHighlightsForKOReaderHighlight(highlight1, highlight2) {
+    let result =
+    (highlight1.highlight.trim() || '') === (highlight2.highlight.trim() || '') &&
+    (highlight1.type.trim() || '') === (highlight2.type.trim() || '') &&
+    (highlight1.page.trim() || '') === (highlight2.page.trim() || '') &&
+    highlight1.location &&
+    highlight2.location &&
+    Number(highlight1.location.start) === Number(highlight2.location.start) &&
+    Number(highlight1.location.end) === Number(highlight2.location.end)
+  
+    return result;
+}
+
 function purgeOverlappingHighlights(highlights) {
     if (!highlights.length) return [];
     const updatedHighlights = [];
@@ -311,9 +324,20 @@ function purgeOverlappingHighlights(highlights) {
 
         let currentStart = current.location.start;
         if(currentStart === -1 && parseInt(current.page) !== NaN) {
+            // We are deailing with a KOREADER highlight here
+            // if start is -1 it is from KOREADER - Jailbroken kindle, skip comparing.
+
+            for(let j = i; j < highlights.length; j++) {
+                if(compareHighlightsForKOReaderHighlight(current, highlights[j])) {
+                    // If we find a match, we skip adding this highlight again.
+                    current = highlights[j];
+                    i = j+1;
+                }else
+                    break;
+            }
             updatedHighlights.push(current);
-            current = next;
-            continue; // if start is -1 it is from KOREADER - Jailbroken kindle, skip comparing.
+            current = highlights[i];
+            continue;
         }
         let currentEnd = current.location.end === -1 ? current.location.start : current.location.end;
         let nextStart = next.location.start;
