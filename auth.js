@@ -1,5 +1,5 @@
 const express = require('express');
-const {transporter} = require('./mailer'); // or '../mailer' based on location
+const transporter = require('./mailer'); // or '../mailer' based on location
 const { OAuth2Client } = require('google-auth-library');
 const crypto = require('crypto');
 const router = express.Router();

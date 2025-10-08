@@ -28,7 +28,7 @@
     "mongodb": "^6.17.0",
     "mongoose": "^8.15.1",
     "multer": "^2.0.1",
-    "nodemailer": "^7.0.9",
+    "nodemailer": "^7.0.3",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
