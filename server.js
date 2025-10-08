@@ -127,15 +127,52 @@ function checkForNewHighlights(highlights, existingHighlightsOnCloud) {
   return false;
 }
 
-async function saveHighlightsToUserProfile(highlights, userId) {
+function checkForNewHighlightsForKindleUpload(highlights, existingHighlightsOnCloud) {
+// Assume cloud highlights have already been purged of redundandant highlights, they are therefore on cloud
+  for(highlight of highlights) {
+    for(cloudHighlight of existingHighlightsOnCloud) {
+      if(highlight.highlight === cloudHighlight.highlight) {
+        // if highlight is already in cloud, current is redundant
+        highlight.isActive = false;
+        break;
+      }
+    }
+    // I want to check if highlights has the isActive property, and if it is set to false
+    if( highlight.isActive !== false) {
+      highlight.isActive = true;
+    } 
+  }
+
+  // I want to save newHighlights as the highlights with isActive true, but without the isActive field
+
+  let newHighlights = [];
+  for(highlight of highlights) {
+    if(highlight.isActive === true) {
+      delete highlight.isActive;
+      newHighlights.push(highlight);
+    }
+  }
+  return newHighlights;
+}
+
+async function saveHighlightsToUserProfile(highlights, userId, isKindleUpload = false) {
     const savePromises = [];
     let newHighlights = 0;
     let newBook = 0;
+  // We can have better naming i.e. books here 
+  // right now highlights is an array of books with highlights inside them.
+  // confusing mate.
   for (const highlight of highlights) {
 
     let book = await Book.findOne({ userId, title: highlight.name, author: highlight.author });
     if (book) {
-      let newHighlightsPresent = checkForNewHighlights(highlight.highlights, book.highlights);
+      let newHighlightsPresent = [];
+      if(isKindleUpload) {
+        newHighlightsPresent = checkForNewHighlightsForKindleUpload(highlight.highlights, book.highlights);
+      }else{
+        newHighlightsPresent = checkForNewHighlights(highlight.highlights, book.highlights);
+
+      }
 
       if(newHighlightsPresent){
         let oldHighlightsCount = book.highlights.length;
@@ -266,6 +303,7 @@ app.post('/get-user-highlights-json', authenticate, upload.single('file'), async
       return res.status(402).json({ message: `Not enough coins. You need ${totalFee} coins for ${uniqueBooks} books.` });
     }
 
+    // WHY IS getHighlights Saving Highlight!? REFACTOR TO DO THIS SEPARATELY
     if(consent === 'true') {
       // Save Books for user's profile
       let [newBook, newHighlights] = await saveHighlightsToUserProfile(highlights, userId);
@@ -730,8 +768,10 @@ app.post('/kindle/upload-clippings', uploadKindle, async (req, res) => {
           });
         }
 
+        const IS_KINDLE_UPLOAD = true;
+
         // Save highlights to user profile
-        const [newBooks, newHighlights] = await saveHighlightsToUserProfile(highlights, userId);
+        const [newBooks, newHighlights] = await saveHighlightsToUserProfile(highlights, userId, IS_KINDLE_UPLOAD);
         const maxHighlights = Math.max(...highlights.map(book => book.highlights.length));
         
         // Update user stats
