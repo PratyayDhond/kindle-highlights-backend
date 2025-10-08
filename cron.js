@@ -4,11 +4,6 @@ const https = require('https');
 const sendNewsletter = require('./utils/sendNewsletter')
 
 const backendUrl = process.env.BACKEND_URL || 'localhost:3000';
-
-// test string for NEWSLETTER_CRON_STRING every 30 seconds
-// Upload the below line to use every 15 seconds
-// const NEWSLETTER_CRON_STRING = '* * * * *';
-
 const NEWSLETTER_CRON_STRING = process.env.NEWSLETTER_CRON_STRING || '0 6-23 * * *'; // Default to run every day at 6 AM
 
 function keepAliveWithRetry(url) {
