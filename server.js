@@ -23,7 +23,9 @@ const rateLimit = require('express-rate-limit'); // Import express-rate-limit
 const app = express();
 const PORT = process.env.PORT || 3000;
 // const SECRET = 'supersecret';
-const parseHighlights = require('./parseHighlights.js'); // Import the highlight parsing function
+const kindleExtensionParser = require('./parseHighlights/parseKindleExtensionHighlights.js'); // Import the highlight parsing function for Kindle Extension
+const parseHighlightsForKindleExtension = kindleExtensionParser.parseHighlights;
+const parseHighlights = require('./parseHighlights/parseHighlights.js'); // Import the highlight parsing function
 const {setProgress, deleteProgress, getProgress} = require('./progress.js');
 const { router: authRoutes, authenticate } = require('./auth.js');
 const {router: newsletterRoutes} = require('./newsletter.js'); // Import the newsletter routes
@@ -31,6 +33,7 @@ const bookHighlightsRouter = require('./bookHighlights'); // Import the book hig
 const User = require('./models/User'); // Adjust path as needed
 const Book = require('./models/Books'); // Adjust path as needed
 const UserStats = require('./models/UserStats'); // Adjust path as needed
+const purgeOverlappingHighlightsForKindleExtension = kindleExtensionParser.purgeOverlappingHighlights;
 const purgeOverlappingHighlights = parseHighlights.purgeOverlappingHighlights; // Import the function to purge overlapping highlights
 
 const FRONTEND_URL = process.env.FRONTEND_URL; // Default to localhost if not set
@@ -700,7 +703,7 @@ app.post('/kindle/upload-clippings', uploadKindle, async (req, res) => {
 
       try {
         // Parse highlights
-        const highlightsData = parseHighlights.parseHighlights(data);
+        const highlightsData = parseHighlightsForKindleExtension(data);
         const highlights = highlightsData.highlights;
         
         if (highlightsData.status === 'error') {
