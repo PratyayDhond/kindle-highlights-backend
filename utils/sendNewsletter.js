@@ -19,6 +19,7 @@ async function getRandomHighlightsForUser(user) {
         books.forEach(book => {
             if (book.highlights && book.highlights.length > 0) {
                 book.highlights.forEach(highlight => {
+                    console.log(highlight);
                     if(highlight.type === 'note')
                         return; // Skip notes, only include highlights
                     highlights.push({
