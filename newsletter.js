@@ -1,8 +1,8 @@
-
 const express = require('express');
 const router = express.Router();
 const User = require('./models/User'); // Adjust path as needed
 const authenticate = require('./auth').authenticate; // Assuming you have an authenticate middleware
+const { sendEmailWithRetry } = require('./mailer'); // or wherever you put the retry function
 
 router.post('/newsletter/subscribe', authenticate, async (req, res) => {
   try {
@@ -62,6 +62,75 @@ router.post('/newsletter/unsubscribe', authenticate, async (req, res) => {
   }
 });
 
+// Update your newsletter function to use the retry wrapper
+
+async function sendNewsletter() {
+    console.log('🚀 Starting newsletter sending process...');
+    let newsLetterCount = 0;
+    let failedCount = 0;
+    let shouldStop = false;
+    
+    // ... your existing user fetching code ...
+    
+    console.log(`📬 Found ${users.length} users to send newsletters to`);
+
+    for (const user of users) {
+        if (shouldStop) {
+            console.log('🛑 Stopping due to authentication/server error');
+            break;
+        }
+        
+        try {
+            console.log(`📤 Processing newsletter for: ${user.email}`);
+            const highlights = await getRandomHighlightsForUser(user);
+            
+            if (highlights.length === 0) {
+                console.log(`⚠️  No highlights found for ${user.email}`);
+                user.lastNewsletterSent = new Date();
+                await user.save();
+                continue;
+            }
+            
+            const { subject, text, html } = newseletterTemplate({ 
+                given_name: user.firstName || 'User', 
+                highlights 
+            });
+            
+            const mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: user.email,
+                subject,
+                text,
+                html
+            };
+            
+            const result = await sendEmailWithRetry(mailOptions, 5);
+            
+            if (result.success) {
+                user.lastNewsletterSent = new Date();
+                await user.save();
+                newsLetterCount++;
+                console.log(`✅ Newsletter sent to ${user.email} (attempt ${result.attempt})`);
+            } else {
+                console.error(`❌ Failed to send to ${user.email}: ${result.error}`);
+                failedCount++;
+                
+                if (result.shouldStop) {
+                    shouldStop = true;
+                }
+            }
+            
+            // Longer delay between emails to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 3000)); // 3 seconds
+            
+        } catch (error) {
+            console.error(`💥 Unexpected error for ${user.email}:`, error);
+            failedCount++;
+        }
+    }
+    
+    console.log(`📊 Newsletter complete: ${newsLetterCount} sent, ${failedCount} failed`);
+}
 
 module.exports = {
   router,
