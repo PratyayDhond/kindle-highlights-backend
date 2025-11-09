@@ -3,6 +3,8 @@ const {setBookCount} = require('../progress.js');
 const {areHighlightsSimilar, dataToArray, simScoreCount, parseBookNameAndAuthor, parsePageLocationTimestampHighlightType, bookExists, createBook, addUserHighlightInBook} = require('./parseCommons.js');
 
 function parseHighlights(fileContent) {
+    const startMemory = process.memoryUsage();
+    console.log('📊 Memory at start:', formatMemory(startMemory));
     const books = [];
     let totalHighlights = 0;
     const note_sep = '==========';
@@ -77,6 +79,13 @@ function parseHighlights(fileContent) {
      console.log('Total highlights:', totalHighlights);
     let [updatedBooks, updatedTotalHighlights] = removeRedundantHighlights(books);
 
+    const endMemory = process.memoryUsage();
+    console.log('📊 Memory at end:', formatMemory(endMemory));
+    console.log('📈 Memory delta:', {
+        heapUsed: (endMemory.heapUsed - startMemory.heapUsed) / 1024 / 1024,
+        heapTotal: (endMemory.heapTotal - startMemory.heapTotal) / 1024 / 1024
+    });
+    
     let stats = {
         totalBooks: updatedBooks.length,
         totalHighlights: updatedTotalHighlights,
@@ -85,6 +94,14 @@ function parseHighlights(fileContent) {
         updatedAt: new Date()
     }
     return { highlights: books, stats };
+}
+
+function formatMemory(memory) {
+    return {
+        heapUsed: Math.round(memory.heapUsed / 1024 / 1024 * 100) / 100 + ' MB',
+        heapTotal: Math.round(memory.heapTotal / 1024 / 1024 * 100) / 100 + ' MB',
+        external: Math.round(memory.external / 1024 / 1024 * 100) / 100 + ' MB'
+    };
 }
 
 function removeRedundantHighlights(books){

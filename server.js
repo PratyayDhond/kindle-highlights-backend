@@ -855,3 +855,24 @@ app.post('/kindle/verify-auth', async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+
+setInterval(() => {
+    const memory = process.memoryUsage();
+    const memoryMB = Math.round(memory.heapUsed / 1024 / 1024);
+    
+    if (memoryMB > 500) { // Alert if using more than 500MB
+        console.warn('🚨 High memory usage:', memoryMB, 'MB');
+        
+        if (global.gc) {
+            console.log('🧹 Running garbage collection...');
+            global.gc();
+        }
+    }
+}, 30000); // Check every 30 seconds
+
+// Handle memory pressure
+process.on('warning', (warning) => {
+    if (warning.name === 'MemoryUsage') {
+        console.error('🚨 Memory warning:', warning.message);
+    }
+});

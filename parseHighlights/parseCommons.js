@@ -3,30 +3,45 @@ const e = require("express");
 
 var simScoreCount = 0;
 
+// Add memoization to avoid recalculating same comparisons
+const similarityCache = new Map();
+
 function areHighlightsSimilar(highlight1, highlight2) {
-    // Check if both highlights are empty or undefined
     if (!highlight1 || !highlight2) return false;
     if (highlight1.trim() === '' && highlight2.trim() === '') return true;
-    // Check if both highlights are exactly the same
+
+    // Quick identity check
     if (highlight1 === highlight2) return true;
-
-    // check if one of the highlights is a substring of the other
-    if (highlight1.includes(highlight2) || highlight2.includes(highlight1))
-        return true;
-
-    // Calculate similarity score
-    const similarityScore = getSimilarityScore(highlight1, highlight2);
-    // Define a threshold for similarity (e.g., 0.8 means 80% similarity)
-    const threshold = process.env.SIMILARITY_THRESHOLD || 0.8;
-    if(similarityScore >= threshold) {
-        // console.log(`Highlights are similar: ${highlight1} | ${highlight2} | Score: ${similarityScore}`);
-        simScoreCount++;
+    
+    // Create cache key
+    const key = highlight1.length < highlight2.length ? `${highlight1}|||${highlight2}` : `${highlight2}|||${highlight1}`;
+    
+    // Check cache first
+    if (similarityCache.has(key)) {
+        return similarityCache.get(key);
     }
-    // Return true if the similarity score is above the threshold
-    return similarityScore >= threshold;
+    
+    // Quick length check
+    const lengthDiff = Math.abs(highlight1.length - highlight2.length);
+    if (lengthDiff > Math.max(highlight1.length, highlight2.length) * 0.3) {
+        similarityCache.set(key, false);
+        return false;
+    }
+    
+    // Your existing similarity logic here
+    const result = calculateSimilarity(highlight1, highlight2) > 0.8; // threshold
+    
+    // Cache result
+    similarityCache.set(key, result);
+    
+    // Clear cache if it gets too large
+    if (similarityCache.size > 1000) {
+        similarityCache.clear();
+    }
+    
+    return result;
 }
 
-// a function to return similarity scores between two texts
 function getSimilarityScore(text1, text2){
     const set1 = new Set(text1.toLowerCase().split(/\s+/));
     const set2 = new Set(text2.toLowerCase().split(/\s+/));
