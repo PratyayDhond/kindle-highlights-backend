@@ -90,12 +90,12 @@ function parseHighlights(fileContent) {
 function removeRedundantHighlights(books){
     let totalHighlights = 0;
     books.forEach(book => {
-        console.log('Removing redundant highlights for book:', book.name);
+        // console.log('Removing redundant highlights for book:', book.name);
         book.highlights = purgeOverlappingHighlights(book.highlights);
         totalHighlights += book.highlights.length;
     });
 
-    console.log(`Total highlights after removing redundant ones: ${totalHighlights}`);
+    // console.log(`Total highlights after removing redundant ones: ${totalHighlights}`);
     console.log(simScoreCount, "similar highlights found");
     return [books, totalHighlights];
 }
@@ -152,7 +152,7 @@ function purgeOverlappingHighlights(highlights) {
             locationCounter++;
         }
     }
-    console.log(locationCounter - 1, "unique highlights retained");
+    // console.log(locationCounter - 1, "unique highlights retained");
     return updatedHighlights;
 }
 

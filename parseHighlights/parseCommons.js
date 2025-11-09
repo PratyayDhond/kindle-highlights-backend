@@ -17,9 +17,9 @@ function areHighlightsSimilar(highlight1, highlight2) {
     // Calculate similarity score
     const similarityScore = getSimilarityScore(highlight1, highlight2);
     // Define a threshold for similarity (e.g., 0.8 means 80% similarity)
-    const threshold = process.env.SIMILARITY_THRESHOLD || 0.7;
+    const threshold = process.env.SIMILARITY_THRESHOLD || 0.8;
     if(similarityScore >= threshold) {
-        console.log(`Highlights are similar: ${highlight1} | ${highlight2} | Score: ${similarityScore}`);
+        // console.log(`Highlights are similar: ${highlight1} | ${highlight2} | Score: ${similarityScore}`);
         simScoreCount++;
     }
     // Return true if the similarity score is above the threshold
