@@ -4,25 +4,20 @@ const e = require("express");
 var simScoreCount = 0;
 
 function areHighlightsSimilar(highlight1, highlight2) {
-    // Check if both highlights are empty or undefined
     if (!highlight1 || !highlight2) return false;
     if (highlight1.trim() === '' && highlight2.trim() === '') return true;
-    // Check if both highlights are exactly the same
     if (highlight1 === highlight2) return true;
 
-    // check if one of the highlights is a substring of the other
     if (highlight1.includes(highlight2) || highlight2.includes(highlight1))
         return true;
 
-    // Calculate similarity score
     const similarityScore = getSimilarityScore(highlight1, highlight2);
-    // Define a threshold for similarity (e.g., 0.8 means 80% similarity)
+
     const threshold = process.env.SIMILARITY_THRESHOLD || 0.7;
     if(similarityScore >= threshold) {
         console.log(`Highlights are similar: ${highlight1} | ${highlight2} | Score: ${similarityScore}`);
         simScoreCount++;
     }
-    // Return true if the similarity score is above the threshold
     return similarityScore >= threshold;
 }
 

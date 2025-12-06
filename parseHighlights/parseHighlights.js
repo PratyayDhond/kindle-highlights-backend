@@ -77,6 +77,7 @@ function parseHighlights(fileContent) {
     }
      console.log('Parsing completed. Total books:', books.length);
      console.log('Total highlights:', totalHighlights);
+     console.log(books)
     let [updatedBooks, updatedTotalHighlights] = removeRedundantHighlights(books);
 
     let stats = {
@@ -92,13 +93,45 @@ function parseHighlights(fileContent) {
 function removeRedundantHighlights(books){
     let totalHighlights = 0;
     books.forEach(book => {
-        book.highlights = purgeOverlappingHighlights(book.highlights);
+        book.highlights = purgeOverlappingHighlightsBrute(book.highlights);
         totalHighlights += book.highlights.length;
     });
 
     console.log(`Total highlights after removing redundant ones: ${totalHighlights}`);
     console.log(simScoreCount, "similar highlights found");
     return [books, totalHighlights];
+}
+
+function purgeOverlappingHighlightsBrute(highlights){
+    // Here, we are getting highlights for a book, so we compare the highlight with each of the other existing highlight
+    // if highlights are similar we keep the latest one with us
+    for(let i = 0; i < highlights.length; i++){
+        for(j = 0; j < highlights.length; j++){
+            if(i === j)
+                continue;
+            if(highlights[j].isDuplicate)
+                continue;
+
+            if(areHighlightsSimilar(highlights[i].highlight, highlights[j].highlight)){
+                let ithHighlightDate = new Date(highlights[i].currentTime).getTime()
+                let jthHighlightDate = new Date(highlights[j].currentTime).getTime()
+                if(ithHighlightDate > jthHighlightDate){
+                    highlights[j].isDuplicate = true;
+                }else{
+                    highlights[i].isDuplicate = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    let updatedHighlights = []
+    for(highlight of highlights){
+        if(!highlight.isDuplicate)
+            updatedHighlights.push(highlight);
+    }
+
+    return updatedHighlights;
 }
 
 
@@ -114,7 +147,7 @@ function purgeOverlappingHighlights(highlights) {
         return a.type.localeCompare(b.type);
       }
 
-      if (a.location.start !== b.location.start) {
+      if (a.location.start !== -1 && a.location.start !== b.location.start) {
         return a.location.start - b.location.start;
       }
       // Keep notes before highlights if at the same location
@@ -134,11 +167,6 @@ function purgeOverlappingHighlights(highlights) {
     for (let i = 1; i < highlights.length; i++) {
         const next = highlights[i];
 
-        // if(current.type === 'note'){
-        //     updatedHighlights.push(current);
-        //     current = next;
-        //     continue;
-        // }
 
         let currentStart = current.location.start;
         let currentEnd = current.location.end === -1 ? current.location.start : current.location.end;
@@ -182,5 +210,5 @@ function purgeOverlappingHighlights(highlights) {
 }
 
 
-module.exports = {parseHighlights, purgeOverlappingHighlights}
+module.exports = {parseHighlights, purgeOverlappingHighlights, purgeOverlappingHighlightsBrute}
 

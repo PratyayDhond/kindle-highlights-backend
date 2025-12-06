@@ -178,7 +178,7 @@ async function saveHighlightsToUserProfile(highlights, userId, isKindleUpload = 
         let oldHighlightsCount = book.highlights.length;
         
         let combinedHighlights = [...book.highlights, ...highlight.highlights];
-        book.highlights = purgeOverlappingHighlights(combinedHighlights);
+        book.highlights = parseHighlights.purgeOverlappingHighlightsBrute(combinedHighlights);
         
         newHighlights += book.highlights.length - oldHighlightsCount;
         // console.log('Saving Changes for book:', highlight.name, 'for user:', userId);
