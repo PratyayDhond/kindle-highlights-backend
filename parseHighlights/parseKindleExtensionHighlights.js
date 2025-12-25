@@ -91,7 +91,7 @@ function removeRedundantHighlights(books){
     let totalHighlights = 0;
     books.forEach(book => {
         // console.log('Removing redundant highlights for book:', book.name);
-        const list = Array.isArray(book.highlights) ? book.highlights : [];
+        const list = Array.isArray(book.highlights) ? book.highlights.filter(Boolean) : [];
         book.highlights = purgeOverlappingHighlights(list);
         totalHighlights += book.highlights.length;
     });
@@ -107,53 +107,61 @@ function purgeOverlappingHighlights(highlights) {
 
 
     // sort highlights by location.start here
-    highlights.sort((a, b) => {
-        if (a.type !== b.type) {
-            return a.type.localeCompare(b.type);
-        }
+        highlights.sort((a, b) => {
+            const aType = a?.type || '';
+            const bType = b?.type || '';
+            if (aType !== bType) {
+                return aType.localeCompare(bType);
+            }
 
-        const aLocStart = a && a.location && typeof a.location.start === 'number' ? a.location.start : -1;
-        const bLocStart = b && b.location && typeof b.location.start === 'number' ? b.location.start : -1;
-        if (aLocStart !== bLocStart) {
-            return aLocStart - bLocStart;
-        }
+            const aLocStart = a?.location && typeof a.location.start === 'number' ? a.location.start : -1;
+            const bLocStart = b?.location && typeof b.location.start === 'number' ? b.location.start : -1;
+            if (aLocStart !== bLocStart) {
+                return aLocStart - bLocStart;
+            }
 
-        const aPageNum = a && a.page ? parseInt(a.page, 10) : NaN;
-        const bPageNum = b && b.page ? parseInt(b.page, 10) : NaN;
-        if (!Number.isNaN(aPageNum) && !Number.isNaN(bPageNum) && aPageNum !== bPageNum) {
-            // Keep notes before highlights if at the same location
-            return aPageNum - bPageNum;
-        }
+            const aPageNum = a?.page ? parseInt(a.page, 10) : NaN;
+            const bPageNum = b?.page ? parseInt(b.page, 10) : NaN;
+            if (!Number.isNaN(aPageNum) && !Number.isNaN(bPageNum) && aPageNum !== bPageNum) {
+                // Keep notes before highlights if at the same location
+                return aPageNum - bPageNum;
+            }
 
-        // If still equal, sort by timestamp
-        return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-    });
+            // If still equal, sort by timestamp
+            return new Date(a?.timestamp).getTime() - new Date(b?.timestamp).getTime();
+        });
 
     for (let i = 0; i < highlights.length; i++) {
+        const hi = highlights[i];
+        if (!hi || !hi.highlight) continue;
         for(let j = 0; j < highlights.length; j++) {
             if(i === j)
                 continue;
-            if(areHighlightsSimilar(highlights[i].highlight, highlights[j].highlight)) {
-                const iTime = new Date(highlights[i].timestamp).getTime();
-                const jTime = new Date(highlights[j].timestamp).getTime();
+            const hj = highlights[j];
+            if (!hj || !hj.highlight)
+                continue;
+            if(areHighlightsSimilar(hi.highlight, hj.highlight)) {
+                const iTime = new Date(hi.timestamp).getTime();
+                const jTime = new Date(hj.timestamp).getTime();
                 if(iTime < jTime) {
-                    highlights[i].isActive = false;
+                    hi.isActive = false;
                     break;
                 }
                 else {
-                    highlights[j].isActive = false;
+                    hj.isActive = false;
                     continue;
                 }
             }
         }
-        if (highlights[i].isActive !== false) {
-            highlights[i].isActive = true;
+        if (hi && hi.isActive !== false) {
+            hi.isActive = true;
         }
     }
 
     let locationCounter = 1;
 
     for (const highlight of highlights) {
+        if(!highlight) continue;
         if(highlight.isActive === true) {
             if (!highlight.location) {
                 highlight.location = { start: locationCounter, end: -1 };
