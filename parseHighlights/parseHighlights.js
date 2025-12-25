@@ -54,6 +54,11 @@ function parseHighlights(fileContent) {
         if (currentNote.length > 0 && currentNote[currentNote.length - 1] === '\n') {
             currentNote = currentNote.slice(0, -1);
         }
+
+        if(currentNote === '') {
+            console.warn('Empty highlight/note found, skipping...');
+            continue;
+        }
         
         book = bookExists(books, bookName)
         if(book === -1){
