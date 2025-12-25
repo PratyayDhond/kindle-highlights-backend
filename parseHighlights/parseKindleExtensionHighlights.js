@@ -33,11 +33,9 @@ function parseHighlights(fileContent) {
     const books = [];
     let totalHighlights = 0;
     const note_sep = '==========';
-    console.log('[ParseKindleExt] Parsing highlights start');
     try {
         rawData = dataToArray(fileContent);
         if (rawData.length === 0) {
-            console.log('[ParseKindleExt] No highlights found');
             return {status: 'error', message: 'No highlights found.', statusCode: 400};
         }
 
@@ -86,8 +84,7 @@ function parseHighlights(fileContent) {
         book = bookExists(books, bookName)
         if(book === -1){
             createBook(books, bookName, author);
-            book = bookExists(books, bookName); // confirm the book was created and return book object
-            console.log('[ParseKindleExt] Created book', {name: bookName, author});
+            book = bookExists(books, bookName);
         }
 
         addUserHighlightInBook(books, bookName, author, currentNote, page, location, timestamp, currentNoteType);
@@ -102,7 +99,6 @@ function parseHighlights(fileContent) {
         if(books.length === 0 && totalHighlights === 0) {
             return {status: 'error', message: 'Incorrect file uploaded. Please upload a valid Kindle clippings file.', statusCode: 418};
         }
-        console.log('[ParseKindleExt] Parsing completed', {books: books.length, totalHighlights});
         let [updatedBooks, updatedTotalHighlights] = removeRedundantHighlights(books);
 
         let stats = {
@@ -131,11 +127,6 @@ function removeRedundantHighlights(books){
             totalHighlights += book.highlights.length;
             
             const elapsed = Date.now() - startTime;
-            console.log('[ParseKindleExt] Dedup done', { 
-                book: book?.name, 
-                remaining: book.highlights.length,
-                elapsed: `${elapsed}ms`
-            });
             
             // Prevent timeout: if dedup is taking too long, skip remaining books
             if (elapsed > 25000) { // 25 seconds
