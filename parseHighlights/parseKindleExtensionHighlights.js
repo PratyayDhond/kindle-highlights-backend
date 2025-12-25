@@ -91,7 +91,8 @@ function removeRedundantHighlights(books){
     let totalHighlights = 0;
     books.forEach(book => {
         // console.log('Removing redundant highlights for book:', book.name);
-        book.highlights = purgeOverlappingHighlights(book.highlights);
+        const list = Array.isArray(book.highlights) ? book.highlights : [];
+        book.highlights = purgeOverlappingHighlights(list);
         totalHighlights += book.highlights.length;
     });
 
@@ -101,27 +102,31 @@ function removeRedundantHighlights(books){
 }
 
 function purgeOverlappingHighlights(highlights) {
-    if (!highlights.length) return [];
+    if (!Array.isArray(highlights) || highlights.length === 0) return [];
     const updatedHighlights = [];
 
 
     // sort highlights by location.start here
     highlights.sort((a, b) => {
-      if (a.type !== b.type) {
-        return a.type.localeCompare(b.type);
-      }
+        if (a.type !== b.type) {
+            return a.type.localeCompare(b.type);
+        }
 
-      if (a.location.start !== b.location.start) {
-        return a.location.start - b.location.start;
-      }
+        const aLocStart = a && a.location && typeof a.location.start === 'number' ? a.location.start : -1;
+        const bLocStart = b && b.location && typeof b.location.start === 'number' ? b.location.start : -1;
+        if (aLocStart !== bLocStart) {
+            return aLocStart - bLocStart;
+        }
 
-      if (a.page && b.page && parseInt(a.page) !== parseInt(b.page)) {
-        // Keep notes before highlights if at the same location
-        return parseInt(a.page) - parseInt(b.page);
-      }
+        const aPageNum = a && a.page ? parseInt(a.page, 10) : NaN;
+        const bPageNum = b && b.page ? parseInt(b.page, 10) : NaN;
+        if (!Number.isNaN(aPageNum) && !Number.isNaN(bPageNum) && aPageNum !== bPageNum) {
+            // Keep notes before highlights if at the same location
+            return aPageNum - bPageNum;
+        }
 
-      // If still equal, sort by timestamp
-      return new Date(a.timestamp) - new Date(b.timestamp);
+        // If still equal, sort by timestamp
+        return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
     });
 
     for (let i = 0; i < highlights.length; i++) {
@@ -129,11 +134,13 @@ function purgeOverlappingHighlights(highlights) {
             if(i === j)
                 continue;
             if(areHighlightsSimilar(highlights[i].highlight, highlights[j].highlight)) {
-                if(highlights[i].timestamp < highlights[j].timestamp) {
+                const iTime = new Date(highlights[i].timestamp).getTime();
+                const jTime = new Date(highlights[j].timestamp).getTime();
+                if(iTime < jTime) {
                     highlights[i].isActive = false;
                     break;
                 }
-                else if(highlights[i].timestamp >= highlights[j].timestamp) {
+                else {
                     highlights[j].isActive = false;
                     continue;
                 }
@@ -144,7 +151,7 @@ function purgeOverlappingHighlights(highlights) {
 
     let locationCounter = 1;
 
-    for(highlight of highlights) {
+    for (const highlight of highlights) {
         if(highlight.isActive === true) {
             highlight.location.start = locationCounter;
             delete highlight.isActive;
