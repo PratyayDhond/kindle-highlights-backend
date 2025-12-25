@@ -117,28 +117,13 @@ function parseHighlights(fileContent) {
 
 function removeRedundantHighlights(books){
     let totalHighlights = 0;
-    const startTime = Date.now();
     
     books.forEach((book, bookIndex) => {
         const list = Array.isArray(book.highlights) ? book.highlights.filter(Boolean) : [];
         
         try {
-            book.highlights = purgeOverlappingHighlights(list, book.name);
+            book.highlights = purgeOverlappingHighlights(list);
             totalHighlights += book.highlights.length;
-            
-            const elapsed = Date.now() - startTime;
-            
-            // Prevent timeout: if dedup is taking too long, skip remaining books
-            if (elapsed > 25000) { // 25 seconds
-                console.warn('[ParseKindleExt] Dedup timeout approaching, processing remaining books without dedup');
-                // Process remaining books without dedup
-                for (let i = bookIndex + 1; i < books.length; i++) {
-                    const remaining = Array.isArray(books[i].highlights) ? books[i].highlights.filter(Boolean) : [];
-                    books[i].highlights = remaining;
-                    totalHighlights += remaining.length;
-                }
-                return false; // Break forEach
-            }
         } catch (err) {
             const sample = list.slice(0, 3).map(summarizeHighlight);
             console.error('[ParseKindleExt] removeRedundantHighlights failed for book', { 
@@ -162,10 +147,7 @@ function purgeOverlappingHighlights(highlights) {
     if (!Array.isArray(highlights) || highlights.length === 0) return [];
     
     // Limit processing to prevent memory issues
-    if (highlights.length > 1000) {
-        console.warn('[ParseKindleExt] Too many highlights to dedupe safely', { count: highlights.length });
-        return highlights;
-    }
+
     
     const updatedHighlights = [];
 

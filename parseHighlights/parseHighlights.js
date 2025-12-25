@@ -103,22 +103,8 @@ function removeRedundantHighlights(books){
         }
         
         try {
-            book.highlights = purgeOverlappingHighlightsBrute(list, book.name);
+            book.highlights = purgeOverlappingHighlightsBrute(list);
             totalHighlights += book.highlights.length;
-            
-            const elapsed = Date.now() - startTime;
-            
-            // Prevent timeout: if dedup is taking too long, skip remaining books
-            if (elapsed > 25000) { // 25 seconds
-                console.warn('[ParseHighlights] Dedup timeout approaching, processing remaining books without dedup');
-                // Process remaining books without dedup
-                for (let i = bookIndex + 1; i < books.length; i++) {
-                    const remaining = Array.isArray(books[i].highlights) ? books[i].highlights : [];
-                    books[i].highlights = remaining;
-                    totalHighlights += remaining.length;
-                }
-                return false; // Break forEach
-            }
         } catch (err) {
             console.error('[ParseHighlights] removeRedundantHighlights failed for book', { 
                 name: book?.name, 
@@ -134,18 +120,11 @@ function removeRedundantHighlights(books){
     return [books, totalHighlights];
 }
 
-function purgeOverlappingHighlightsBrute(highlights, bookName){
+function purgeOverlappingHighlightsBrute(highlights){
     // Here, we are getting highlights for a book, so we compare the highlight with each of the other existing highlight
     // if highlights are similar we keep the latest one with us
     if (!Array.isArray(highlights) || highlights.length === 0) return [];
-    
-    console.log('[ParseHighlights] Purging overlapping highlights', { book: bookName, count: highlights.length });
-    
-    // Limit processing to prevent memory issues
-    if (highlights.length > 1000) {
-        console.warn('[ParseHighlights] Too many highlights to dedupe safely', { book: bookName, count: highlights.length });
-        return highlights;
-    }
+
     for(let i = 0; i < highlights.length; i++){
         for(let j = 0; j < highlights.length; j++){
             if(i === j)
