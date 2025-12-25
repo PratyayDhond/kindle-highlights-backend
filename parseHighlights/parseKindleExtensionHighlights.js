@@ -6,22 +6,23 @@ function parseHighlights(fileContent) {
     const books = [];
     let totalHighlights = 0;
     const note_sep = '==========';
-     console.log('Parsing highlights...');
-    rawData = dataToArray(fileContent);
-    if (rawData.length === 0) {
-         console.log('No highlights found.');
-        return {status: 'error', message: 'No highlights found.', statusCode: 400};
-    }
+    console.log('[ParseKindleExt] Parsing highlights start');
+    try {
+        rawData = dataToArray(fileContent);
+        if (rawData.length === 0) {
+            console.log('[ParseKindleExt] No highlights found');
+            return {status: 'error', message: 'No highlights found.', statusCode: 400};
+        }
 
-    var author = '';
-    var bookName = '';
-    var currentNote = '';
-    var page = '';
-    var location = {start: undefined, end: undefined};
-    var timestamp = '';
-    var currentNoteType = '';
-    var i = 0;
-    var book = {};
+        var author = '';
+        var bookName = '';
+        var currentNote = '';
+        var page = '';
+        var location = {start: undefined, end: undefined};
+        var timestamp = '';
+        var currentNoteType = '';
+        var i = 0;
+        var book = {};
 
     while(rawData[i] === '' || rawData[i].trimRight() === note_sep)
         i++;
@@ -40,7 +41,7 @@ function parseHighlights(fileContent) {
         [page, location, timestamp, currentNoteType] = parsePageLocationTimestampHighlightType(dataLine2);
         
         if(currentNoteType === 'unknown' && location.start === -1 && location.end === -1 && page === '') {
-            console.log('Incorrect file uploaded'); // this is not a valid kindle clippings file
+            console.log('[ParseKindleExt] Incorrect file uploaded (unknown type, no location, no page)'); // this is not a valid kindle clippings file
             // Here we are setting error code to 418 (I'm a teapot) as a playful way to indicate that the file is not a valid Kindle clippings file.
             return {status: 'error', message: 'Incorrect file uploaded. Please upload a valid Kindle clippings file.', statusCode: 418};
         }
@@ -59,6 +60,7 @@ function parseHighlights(fileContent) {
         if(book === -1){
             createBook(books, bookName, author);
             book = bookExists(books, bookName); // confirm the book was created and return book object
+            console.log('[ParseKindleExt] Created book', {name: bookName, author});
         }
 
         addUserHighlightInBook(books, bookName, author, currentNote, page, location, timestamp, currentNoteType);
@@ -69,22 +71,25 @@ function parseHighlights(fileContent) {
             i++;
         }
     }
-    setBookCount(books.length);
-    if(books.length === 0 && totalHighlights === 0) {
-        return {status: 'error', message: 'Incorrect file uploaded. Please upload a valid Kindle clippings file.', statusCode: 418};
-    }
-     console.log('Parsing completed. Total books:', books.length);
-     console.log('Total highlights:', totalHighlights);
-    let [updatedBooks, updatedTotalHighlights] = removeRedundantHighlights(books);
+        setBookCount(books.length);
+        if(books.length === 0 && totalHighlights === 0) {
+            return {status: 'error', message: 'Incorrect file uploaded. Please upload a valid Kindle clippings file.', statusCode: 418};
+        }
+        console.log('[ParseKindleExt] Parsing completed', {books: books.length, totalHighlights});
+        let [updatedBooks, updatedTotalHighlights] = removeRedundantHighlights(books);
 
-    let stats = {
-        totalBooks: updatedBooks.length,
-        totalHighlights: updatedTotalHighlights,
-        avgHighlights: updatedTotalHighlights / updatedBooks.length,
-        maxHighlights: Math.max(...updatedBooks.map(book => book.highlights.length)),
-        updatedAt: new Date()
+        let stats = {
+            totalBooks: updatedBooks.length,
+            totalHighlights: updatedTotalHighlights,
+            avgHighlights: updatedTotalHighlights / updatedBooks.length,
+            maxHighlights: Math.max(...updatedBooks.map(book => book.highlights.length)),
+            updatedAt: new Date()
+        }
+        return { highlights: books, stats };
+    } catch (err) {
+        console.error('[ParseKindleExt] parseHighlights failed', { message: err.message, code: err.code, stack: err.stack });
+        return { status: 'error', message: 'Parsing failed', statusCode: 500 };
     }
-    return { highlights: books, stats };
 }
 
 function removeRedundantHighlights(books){
@@ -92,8 +97,13 @@ function removeRedundantHighlights(books){
     books.forEach(book => {
         // console.log('Removing redundant highlights for book:', book.name);
         const list = Array.isArray(book.highlights) ? book.highlights.filter(Boolean) : [];
-        book.highlights = purgeOverlappingHighlights(list);
-        totalHighlights += book.highlights.length;
+        try {
+            book.highlights = purgeOverlappingHighlights(list);
+            totalHighlights += book.highlights.length;
+        } catch (err) {
+            console.error('[ParseKindleExt] removeRedundantHighlights failed for book', { name: book?.name, err: err.message, code: err.code, stack: err.stack });
+            book.highlights = list;
+        }
     });
 
     console.log(`Total highlights after removing redundant ones: ${totalHighlights}`);
