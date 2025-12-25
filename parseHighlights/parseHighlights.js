@@ -103,7 +103,7 @@ function removeRedundantHighlights(books){
         }
         
         try {
-            book.highlights = purgeOverlappingHighlightsBrute(list);
+            book.highlights = purgeOverlappingHighlightsBrute(list, book.name);
             totalHighlights += book.highlights.length;
             
             const elapsed = Date.now() - startTime;
@@ -134,14 +134,16 @@ function removeRedundantHighlights(books){
     return [books, totalHighlights];
 }
 
-function purgeOverlappingHighlightsBrute(highlights){
+function purgeOverlappingHighlightsBrute(highlights, bookName){
     // Here, we are getting highlights for a book, so we compare the highlight with each of the other existing highlight
     // if highlights are similar we keep the latest one with us
     if (!Array.isArray(highlights) || highlights.length === 0) return [];
     
+    console.log('[ParseHighlights] Purging overlapping highlights', { book: bookName, count: highlights.length });
+    
     // Limit processing to prevent memory issues
     if (highlights.length > 1000) {
-        console.warn('[ParseHighlights] Too many highlights to dedupe safely', { count: highlights.length });
+        console.warn('[ParseHighlights] Too many highlights to dedupe safely', { book: bookName, count: highlights.length });
         return highlights;
     }
     for(let i = 0; i < highlights.length; i++){

@@ -123,7 +123,7 @@ function removeRedundantHighlights(books){
         const list = Array.isArray(book.highlights) ? book.highlights.filter(Boolean) : [];
         
         try {
-            book.highlights = purgeOverlappingHighlights(list);
+            book.highlights = purgeOverlappingHighlights(list, book.name);
             totalHighlights += book.highlights.length;
             
             const elapsed = Date.now() - startTime;
