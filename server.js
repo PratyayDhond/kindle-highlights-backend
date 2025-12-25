@@ -739,8 +739,20 @@ app.post('/kindle/upload-clippings', uploadKindle, async (req, res) => {
         return res.status(500).json({ message: 'Error reading uploaded file' });
       }
 
+      // Encoding diagnostics
+      const hasUnicode = /[^\x00-\x7F]/.test(data);
+      const specialChars = data.match(/[^\x00-\x7F]/g)?.slice(0, 10) || [];
+      console.log('[Kindle Upload] File encoding check', { 
+        userId,
+        hasUnicode, 
+        sampleSpecialChars: specialChars.map(c => `${c}(U+${c.charCodeAt(0).toString(16).toUpperCase()})`),
+        fileSize: data.length,
+        originalName: file.originalname 
+      });
+
       try {
         // Parse highlights
+        console.log('[Kindle Upload] Starting parse for user', userId);
         const highlightsData = parseHighlightsForKindleExtension(data);
         const highlights = highlightsData.highlights;
         
@@ -801,7 +813,14 @@ app.post('/kindle/upload-clippings', uploadKindle, async (req, res) => {
         });
 
       } catch (processingError) {
-        console.error('Error processing highlights:', processingError);
+        console.error('[Kindle Upload] Error processing highlights', {
+          userId,
+          error: processingError.message,
+          stack: processingError.stack,
+          name: processingError.name,
+          hasUnicode,
+          fileSize: data?.length
+        });
         return res.status(500).json({ 
           message: 'Error processing highlights file',
           error: processingError.message 

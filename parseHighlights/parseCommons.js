@@ -75,7 +75,26 @@ function parseLocation(location) {
 
 
 function dataToArray(data) {
-  return data.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+  try {
+    if (!data || typeof data !== 'string') {
+      console.error('[parseCommons] dataToArray received invalid data', { type: typeof data });
+      return [];
+    }
+    // Normalize Unicode before splitting to handle special characters consistently
+    const normalized = data.normalize ? data.normalize('NFC') : data;
+    return normalized.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+  } catch (err) {
+    console.error('[parseCommons] dataToArray failed', { 
+      err: err.message, 
+      dataPreview: data?.slice(0, 100) 
+    });
+    // Fallback: try without normalization
+    try {
+      return data.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    } catch {
+      return [];
+    }
+  }
 }
 
 
