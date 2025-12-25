@@ -2,6 +2,20 @@ const e = require("express");
 const {setBookCount} = require('../progress.js');
 const {areHighlightsSimilar, dataToArray, simScoreCount, parseBookNameAndAuthor, parsePageLocationTimestampHighlightType, bookExists, createBook, addUserHighlightInBook} = require('./parseCommons.js');
 
+function summarizeHighlight(h) {
+    if (!h) return { status: 'nil' };
+    const snippet = typeof h.highlight === 'string' ? h.highlight.slice(0, 80) : '';
+    return {
+        status: 'ok',
+        type: h.type,
+        page: h.page,
+        location: h.location,
+        timestamp: h.timestamp,
+        hasText: !!h.highlight,
+        textPreview: snippet,
+    };
+}
+
 function parseHighlights(fileContent) {
     const books = [];
     let totalHighlights = 0;
@@ -95,13 +109,15 @@ function parseHighlights(fileContent) {
 function removeRedundantHighlights(books){
     let totalHighlights = 0;
     books.forEach(book => {
-        // console.log('Removing redundant highlights for book:', book.name);
         const list = Array.isArray(book.highlights) ? book.highlights.filter(Boolean) : [];
+        console.log('[ParseKindleExt] Dedup start', { book: book?.name, author: book?.author, count: list.length });
         try {
             book.highlights = purgeOverlappingHighlights(list);
             totalHighlights += book.highlights.length;
+            console.log('[ParseKindleExt] Dedup done', { book: book?.name, remaining: book.highlights.length });
         } catch (err) {
-            console.error('[ParseKindleExt] removeRedundantHighlights failed for book', { name: book?.name, err: err.message, code: err.code, stack: err.stack });
+            const sample = list.slice(0, 3).map(summarizeHighlight);
+            console.error('[ParseKindleExt] removeRedundantHighlights failed for book', { name: book?.name, err: err.message, code: err.code, stack: err.stack, sample });
             book.highlights = list;
         }
     });
