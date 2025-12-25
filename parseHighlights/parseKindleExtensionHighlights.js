@@ -5,6 +5,7 @@ const {areHighlightsSimilar, dataToArray, simScoreCount, parseBookNameAndAuthor,
 function summarizeHighlight(h) {
     if (!h) return { status: 'nil' };
     const snippet = typeof h.highlight === 'string' ? h.highlight.slice(0, 80) : '';
+    const hasSpecialChars = /[^\x00-\x7F]/.test(snippet);
     return {
         status: 'ok',
         type: h.type,
@@ -13,7 +14,19 @@ function summarizeHighlight(h) {
         timestamp: h.timestamp,
         hasText: !!h.highlight,
         textPreview: snippet,
+        hasSpecialChars,
     };
+}
+
+function safeStringOp(str) {
+    if (!str || typeof str !== 'string') return '';
+    try {
+        // Normalize unicode and handle potential encoding issues
+        return str.normalize ? str.normalize('NFC') : str;
+    } catch (e) {
+        console.warn('[ParseKindleExt] String normalization failed', { preview: str.slice(0, 40) });
+        return str;
+    }
 }
 
 function parseHighlights(fileContent) {
@@ -166,17 +179,30 @@ function purgeOverlappingHighlights(highlights) {
             const hj = highlights[j];
             if (!hj || !hj.highlight)
                 continue;
-            if(areHighlightsSimilar(hi.highlight, hj.highlight)) {
-                const iTime = new Date(hi.timestamp).getTime();
-                const jTime = new Date(hj.timestamp).getTime();
-                if(iTime < jTime) {
-                    hi.isActive = false;
-                    break;
+            try {
+                const iHighlight = safeStringOp(hi.highlight);
+                const jHighlight = safeStringOp(hj.highlight);
+                if(areHighlightsSimilar(iHighlight, jHighlight)) {
+                    const iTime = new Date(hi.timestamp).getTime();
+                    const jTime = new Date(hj.timestamp).getTime();
+                    if(iTime < jTime) {
+                        hi.isActive = false;
+                        break;
+                    }
+                    else {
+                        hj.isActive = false;
+                        continue;
+                    }
                 }
-                else {
-                    hj.isActive = false;
-                    continue;
-                }
+            } catch (err) {
+                console.error('[ParseKindleExt] Similarity check failed', {
+                    i, j,
+                    iPreview: hi.highlight?.slice(0, 40),
+                    jPreview: hj.highlight?.slice(0, 40),
+                    err: err.message,
+                    stack: err.stack
+                });
+                // Skip this comparison and continue
             }
         }
         if (hi && hi.isActive !== false) {

@@ -4,31 +4,56 @@ const e = require("express");
 var simScoreCount = 0;
 
 function areHighlightsSimilar(highlight1, highlight2) {
-    if (!highlight1 || !highlight2) return false;
-    if (highlight1.trim() === '' && highlight2.trim() === '') return true;
-    if (highlight1 === highlight2) return true;
+    try {
+        if (!highlight1 || !highlight2) return false;
+        
+        // Normalize strings to handle Unicode consistently
+        const h1 = typeof highlight1 === 'string' && highlight1.normalize ? highlight1.normalize('NFC') : highlight1;
+        const h2 = typeof highlight2 === 'string' && highlight2.normalize ? highlight2.normalize('NFC') : highlight2;
+        
+        if (h1.trim() === '' && h2.trim() === '') return true;
+        if (h1 === h2) return true;
 
-    if (highlight1.includes(highlight2) || highlight2.includes(highlight1))
-        return true;
+        if (h1.includes(h2) || h2.includes(h1))
+            return true;
 
-    const similarityScore = getSimilarityScore(highlight1, highlight2);
+        const similarityScore = getSimilarityScore(h1, h2);
 
-    const threshold = process.env.SIMILARITY_THRESHOLD || 0.7;
-    if(similarityScore >= threshold) {
-        // console.log(`Highlights are similar: ${highlight1} | ${highlight2} | Score: ${similarityScore}`);
-        simScoreCount++;
+        const threshold = process.env.SIMILARITY_THRESHOLD || 0.7;
+        if(similarityScore >= threshold) {
+            // console.log(`Highlights are similar: ${h1} | ${h2} | Score: ${similarityScore}`);
+            simScoreCount++;
+        }
+        return similarityScore >= threshold;
+    } catch (err) {
+        console.error('[parseCommons] areHighlightsSimilar failed', {
+            err: err.message,
+            h1Preview: highlight1?.slice(0, 40),
+            h2Preview: highlight2?.slice(0, 40)
+        });
+        // On error, treat as not similar
+        return false;
     }
-    return similarityScore >= threshold;
 }
 
 // a function to return similarity scores between two texts
 function getSimilarityScore(text1, text2){
-    const set1 = new Set(text1.toLowerCase().split(/\s+/));
-    const set2 = new Set(text2.toLowerCase().split(/\s+/));
-    const intersection = new Set([...set1].filter(x => set2.has(x)));
-    const union = new Set([...set1, ...set2]);
-    if (union.size === 0) return 0;
-    return intersection.size / union.size;
+    try {
+        if (!text1 || !text2) return 0;
+        const set1 = new Set(text1.toLowerCase().split(/\s+/));
+        const set2 = new Set(text2.toLowerCase().split(/\s+/));
+        const intersection = new Set([...set1].filter(x => set2.has(x)));
+        const union = new Set([...set1, ...set2]);
+        if (union.size === 0) return 0;
+        return intersection.size / union.size;
+    } catch (err) {
+        console.error('[parseCommons] getSimilarityScore failed', {
+            err: err.message,
+            t1Preview: text1?.slice(0, 30),
+            t2Preview: text2?.slice(0, 30)
+        });
+        return 0;
+    }
 }
 
 
