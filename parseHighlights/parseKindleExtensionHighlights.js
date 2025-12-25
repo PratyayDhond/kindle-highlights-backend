@@ -146,14 +146,20 @@ function purgeOverlappingHighlights(highlights) {
                 }
             }
         }
-        highlights[i].isActive = true;
+        if (highlights[i].isActive !== false) {
+            highlights[i].isActive = true;
+        }
     }
 
     let locationCounter = 1;
 
     for (const highlight of highlights) {
         if(highlight.isActive === true) {
-            highlight.location.start = locationCounter;
+            if (!highlight.location) {
+                highlight.location = { start: locationCounter, end: -1 };
+            } else {
+                highlight.location.start = locationCounter;
+            }
             delete highlight.isActive;
             updatedHighlights.push(highlight);
             locationCounter++;

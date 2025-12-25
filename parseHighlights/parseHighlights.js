@@ -75,9 +75,8 @@ function parseHighlights(fileContent) {
     if(books.length === 0 && totalHighlights === 0) {
         return {status: 'error', message: 'Incorrect file uploaded. Please upload a valid Kindle clippings file.', statusCode: 418};
     }
-     console.log('Parsing completed. Total books:', books.length);
-     console.log('Total highlights:', totalHighlights);
-     console.log(books)
+    console.log('Parsing completed. Total books:', books.length);
+    console.log('Total highlights:', totalHighlights);
     let [updatedBooks, updatedTotalHighlights] = removeRedundantHighlights(books);
 
     let stats = {
@@ -93,7 +92,8 @@ function parseHighlights(fileContent) {
 function removeRedundantHighlights(books){
     let totalHighlights = 0;
     books.forEach(book => {
-        book.highlights = purgeOverlappingHighlightsBrute(book.highlights);
+        const list = Array.isArray(book.highlights) ? book.highlights : [];
+        book.highlights = purgeOverlappingHighlightsBrute(list);
         totalHighlights += book.highlights.length;
     });
 
@@ -105,28 +105,49 @@ function removeRedundantHighlights(books){
 function purgeOverlappingHighlightsBrute(highlights){
     // Here, we are getting highlights for a book, so we compare the highlight with each of the other existing highlight
     // if highlights are similar we keep the latest one with us
+    if (!Array.isArray(highlights) || highlights.length === 0) return [];
     for(let i = 0; i < highlights.length; i++){
-        for(j = 0; j < highlights.length; j++){
+        for(let j = 0; j < highlights.length; j++){
             if(i === j)
                 continue;
             if(highlights[j].isDuplicate)
                 continue;
 
             if(areHighlightsSimilar(highlights[i].highlight, highlights[j].highlight)){
-                let ithHighlightDate = new Date(highlights[i].currentTime).getTime()
-                let jthHighlightDate = new Date(highlights[j].currentTime).getTime()
-                if(ithHighlightDate > jthHighlightDate){
+                const iTime = new Date(highlights[i].timestamp).getTime();
+                const jTime = new Date(highlights[j].timestamp).getTime();
+                const iValid = Number.isFinite(iTime);
+                const jValid = Number.isFinite(jTime);
+                if (iValid && jValid) {
+                    if (iTime > jTime) {
+                        highlights[j].isDuplicate = true;
+                    } else {
+                        highlights[i].isDuplicate = true;
+                        break;
+                    }
+                } else if (iValid && !jValid) {
+                    // Prefer the one with a valid timestamp
                     highlights[j].isDuplicate = true;
-                }else{
+                } else if (!iValid && jValid) {
                     highlights[i].isDuplicate = true;
                     break;
+                } else {
+                    // Neither has a valid timestamp; prefer the longer text, else keep first
+                    const iLen = (highlights[i].highlight || '').length;
+                    const jLen = (highlights[j].highlight || '').length;
+                    if (iLen >= jLen) {
+                        highlights[j].isDuplicate = true;
+                    } else {
+                        highlights[i].isDuplicate = true;
+                        break;
+                    }
                 }
             }
         }
     }
 
     let updatedHighlights = []
-    for(highlight of highlights){
+    for(const highlight of highlights){
         if(!highlight.isDuplicate)
             updatedHighlights.push(highlight);
     }
