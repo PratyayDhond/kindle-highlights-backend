@@ -7,10 +7,8 @@ function parseHighlights(fileContent) {
     const books = [];
     let totalHighlights = 0;
     const note_sep = '==========';
-     console.log('Parsing highlights...');
     rawData = dataToArray(fileContent);
     if (rawData.length === 0) {
-         console.log('No highlights found.');
         return {status: 'error', message: 'No highlights found.', statusCode: 400};
     }
 
@@ -75,8 +73,8 @@ function parseHighlights(fileContent) {
     if(books.length === 0 && totalHighlights === 0) {
         return {status: 'error', message: 'Incorrect file uploaded. Please upload a valid Kindle clippings file.', statusCode: 418};
     }
-    console.log('Parsing completed. Total books:', books.length);
-    console.log('Total highlights:', totalHighlights);
+    // console.log('Parsing completed. Total books:', books.length);
+    // console.log('Total highlights:', totalHighlights);
     let [updatedBooks, updatedTotalHighlights] = removeRedundantHighlights(books);
 
     let stats = {
@@ -91,14 +89,48 @@ function parseHighlights(fileContent) {
 
 function removeRedundantHighlights(books){
     let totalHighlights = 0;
-    books.forEach(book => {
+    const startTime = Date.now();
+    
+    books.forEach((book, bookIndex) => {
         const list = Array.isArray(book.highlights) ? book.highlights : [];
-        book.highlights = purgeOverlappingHighlightsBrute(list);
-        totalHighlights += book.highlights.length;
+        
+        // Skip deduplication for books with too many highlights to prevent timeout
+        if (list.length > 500) {
+            console.warn('[ParseHighlights] Skipping dedup for large book', { count: list.length });
+            book.highlights = list;
+            totalHighlights += list.length;
+            return;
+        }
+        
+        try {
+            book.highlights = purgeOverlappingHighlightsBrute(list);
+            totalHighlights += book.highlights.length;
+            
+            const elapsed = Date.now() - startTime;
+            
+            // Prevent timeout: if dedup is taking too long, skip remaining books
+            if (elapsed > 25000) { // 25 seconds
+                console.warn('[ParseHighlights] Dedup timeout approaching, processing remaining books without dedup');
+                // Process remaining books without dedup
+                for (let i = bookIndex + 1; i < books.length; i++) {
+                    const remaining = Array.isArray(books[i].highlights) ? books[i].highlights : [];
+                    books[i].highlights = remaining;
+                    totalHighlights += remaining.length;
+                }
+                return false; // Break forEach
+            }
+        } catch (err) {
+            console.error('[ParseHighlights] removeRedundantHighlights failed for book', { 
+                name: book?.name, 
+                err: err.message, 
+                code: err.code, 
+                stack: err.stack 
+            });
+            book.highlights = list;
+            totalHighlights += list.length;
+        }
     });
 
-    console.log(`Total highlights after removing redundant ones: ${totalHighlights}`);
-    console.log(simScoreCount, "similar highlights found");
     return [books, totalHighlights];
 }
 
@@ -106,6 +138,12 @@ function purgeOverlappingHighlightsBrute(highlights){
     // Here, we are getting highlights for a book, so we compare the highlight with each of the other existing highlight
     // if highlights are similar we keep the latest one with us
     if (!Array.isArray(highlights) || highlights.length === 0) return [];
+    
+    // Limit processing to prevent memory issues
+    if (highlights.length > 1000) {
+        console.warn('[ParseHighlights] Too many highlights to dedupe safely', { count: highlights.length });
+        return highlights;
+    }
     for(let i = 0; i < highlights.length; i++){
         for(let j = 0; j < highlights.length; j++){
             if(i === j)
