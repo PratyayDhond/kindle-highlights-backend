@@ -56,7 +56,7 @@ app.use(cors({
   },
   credentials: true // Allow cookies to be sent
 }));
-
+console.log('CORS allowedOrigins:', allowedOrigins);
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(authRoutes);
