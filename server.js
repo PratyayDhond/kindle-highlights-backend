@@ -2,11 +2,7 @@
 
 require('dotenv').config();
 
-const {startCronJob} = require('./cron'); // Import the cron job to keep the server alive
-startCronJob(); // Start the cron job when the server starts
-
-const {startNewsletterJob} = require('./cron'); // Import the cron job to send newsletters
-startNewsletterJob(); // Start the newsletter cron job when the server starts
+const {startCronJob, startNewsletterJob} = require('./cron'); // Import cron jobs
 
 const express = require('express');
 const cors = require('cors');
@@ -538,15 +534,23 @@ app.delete('/user/kindle-secret', authenticate, async (req, res) => {
   }
 });
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI)
-.then(() =>  console.log('MongoDB connected!'))
-.catch(err => {
-  console.error('MongoDB connection error:', err);
-  process.exit(1);
+// Start listening on the port FIRST (required for Cloud Run health checks)
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  
+  // Start cron jobs after server is listening
+  startCronJob();
+  startNewsletterJob();
+  
+  // Connect to MongoDB AFTER the server is listening
+  mongoose.connect(process.env.MONGODB_URI)
+    .then(() => console.log('MongoDB connected!'))
+    .catch(err => {
+      console.error('MongoDB connection error:', err);
+      // Don't exit - let the server stay up for health checks
+      // Routes will fail gracefully if MongoDB is down
+    });
 });
-
-app.listen(PORT, () =>  console.log(`Server running on port ${PORT}`));
 
 // Create a custom rate limiter for Kindle endpoints
 const kindleRateLimit = rateLimit({
