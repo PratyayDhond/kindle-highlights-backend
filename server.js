@@ -108,9 +108,24 @@ function checkForNewHighlights(highlights, existingHighlightsOnCloud) {
   // If there are more highlights locally than on the cloud, there must be new ones
   if (highlights.length > existingHighlightsOnCloud.length) return true;
 
-  // Sort both arrays for consistent comparison
-  highlights.sort((a, b) => a.location.start - b.location.start);
-  existingHighlightsOnCloud.sort((a, b) => a.location.start - b.location.start);
+  // Sort both arrays for consistent comparison (by location, then by page as fallback)
+  const sortByLocationThenPage = (a, b) => {
+    const aLocStart = a?.location?.start ?? -1;
+    const bLocStart = b?.location?.start ?? -1;
+    if (aLocStart !== -1 && bLocStart !== -1 && aLocStart !== bLocStart) {
+      return aLocStart - bLocStart;
+    }
+    // Fallback to page sorting (convert to int first)
+    const aPageNum = a?.page ? parseInt(a.page, 10) : NaN;
+    const bPageNum = b?.page ? parseInt(b.page, 10) : NaN;
+    if (!Number.isNaN(aPageNum) && !Number.isNaN(bPageNum)) {
+      return aPageNum - bPageNum;
+    }
+    return 0;
+  };
+
+  highlights.sort(sortByLocationThenPage);
+  existingHighlightsOnCloud.sort(sortByLocationThenPage);
 
   // For each local highlight, check if it exists in the cloud highlights
   for (let i = 0; i < highlights.length; i++) {
@@ -523,16 +538,15 @@ app.delete('/user/kindle-secret', authenticate, async (req, res) => {
   }
 });
 
-// Start listening FIRST so Cloud Run sees the port open
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
-// Connect to MongoDB after server starts
+// Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
-.then(() => console.log('MongoDB connected!'))
+.then(() =>  console.log('MongoDB connected!'))
 .catch(err => {
   console.error('MongoDB connection error:', err);
-  // Don't exit - let Cloud Run handle the unhealthy state
+  process.exit(1);
 });
+
+app.listen(PORT, () =>  console.log(`Server running on port ${PORT}`));
 
 // Create a custom rate limiter for Kindle endpoints
 const kindleRateLimit = rateLimit({

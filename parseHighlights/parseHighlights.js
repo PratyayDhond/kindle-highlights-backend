@@ -197,6 +197,13 @@ function purgeOverlappingHighlights(highlights) {
       }
       // Keep notes before highlights if at the same location
 
+      // If locations are equal, sort by page (convert to int first)
+      const aPageNum = a?.page ? parseInt(a.page, 10) : NaN;
+      const bPageNum = b?.page ? parseInt(b.page, 10) : NaN;
+      if (!Number.isNaN(aPageNum) && !Number.isNaN(bPageNum) && aPageNum !== bPageNum) {
+        return aPageNum - bPageNum;
+      }
+
       // If still equal, sort by timestamp
       return new Date(a.timestamp) - new Date(b.timestamp);
     });
