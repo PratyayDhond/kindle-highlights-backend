@@ -28,6 +28,7 @@ const {router: newsletterRoutes} = require('./newsletter.js'); // Import the new
 const bookHighlightsRouter = require('./bookHighlights'); // Import the book highlights router
 const User = require('./models/User'); // Adjust path as needed
 const Book = require('./models/Books'); // Adjust path as needed
+const Highlight = require('./models/Highlight'); // New Highlight model
 const UserStats = require('./models/UserStats'); // Adjust path as needed
 const purgeOverlappingHighlightsForKindleExtension = kindleExtensionParser.purgeOverlappingHighlights;
 const purgeOverlappingHighlights = parseHighlights.purgeOverlappingHighlights; // Import the function to purge overlapping highlights
@@ -167,79 +168,81 @@ function checkForNewHighlightsForKindleUpload(highlights, existingHighlightsOnCl
 }
 
 async function saveHighlightsToUserProfile(highlights, userId, isKindleUpload = false) {
-    const savePromises = [];
-    let newHighlights = 0;
-    let newBook = 0;
-  // We can have better naming i.e. books here 
-  // right now highlights is an array of books with highlights inside them.
-  // confusing mate.
-  for (const highlight of highlights) {
-
-    let book = await Book.findOne({ userId, title: highlight.name, author: highlight.author });
-    if (book) {
-      let newHighlightsPresent = [];
-      if(isKindleUpload) {
-        newHighlightsPresent = checkForNewHighlightsForKindleUpload(highlight.highlights, book.highlights);
-      }else{
-        newHighlightsPresent = checkForNewHighlights(highlight.highlights, book.highlights);
-
-      }
-
-      if(newHighlightsPresent){
-        let oldHighlightsCount = book.highlights.length;
-        
-        let combinedHighlights = [...book.highlights, ...highlight.highlights];
-        book.highlights = parseHighlights.purgeOverlappingHighlightsBrute(combinedHighlights);
-        
-        newHighlights += book.highlights.length - oldHighlightsCount;
-        // console.log('Saving Changes for book:', highlight.name, 'for user:', userId);
-        savePromises.push(book.save());
-      }
-      continue;
-    }
-
-    let bookHighlights = [];
-
-    for(const h of highlight.highlights) {
-        // I want to check if the book already exists for the user
-        // If it does, I want to update the highlights for that book
-        // If it doesn't, I want to create a new book with the highlights
-
-
-        let temp = {
-          highlight : String(h.highlight).trim(), // Ensure highlight is a string
-          type : String(h.type).trim(), // "highlight", "note", "bookmark"
-          page : String(h.page).trim(), // Ensure page is a string
-          location : { start: Number(h.location.start), end: Number(h.location.end) }, // Store location
-          timestamp : String(h.timestamp).trim() // Ensure timestamp is a string
-        }
-
-        if(temp.highlight === '') { // this handles deleted notes and highlights as well as bookmarks.
-          continue;
-        }
-
-        // if(temp.type === 'note')
-        //   console.log('Note found:', temp.highlight, 'at', temp.location.start, 'for book:', highlight.name);
-
-        bookHighlights.push(temp);
-        // bookHighlights.push({highlight: String(h.highlight).trim(), type: String(h.type).trim(), timestamp: String(h.timestamp).trim()});
-      }
-      // Create a new book entry if it doesn't exist
+    let newHighlightsCount = 0;
+    let newBookCount = 0;
+  
+  // highlights is an array of books with highlights inside them
+  for (const bookData of highlights) {
+    // Find or create the book
+    let book = await Book.findOne({ userId, title: bookData.name, author: bookData.author });
+    
+    if (!book) {
+      // Create new book
       book = new Book({
         userId,
-        title: highlight.name,
-        author: highlight.author,
-        highlights: bookHighlights, // Store the highlights array
-        // highlights: highlight.highlights // Spread operator to add highlights
+        title: bookData.name,
+        author: bookData.author
       });
-      newBook += 1;
-      newHighlights += bookHighlights.length;
-      // #todo
-      // figure out why new highlights increase for the same file being reuploaded.
-    savePromises.push(book.save());
+      await book.save();
+      newBookCount += 1;
+    }
+
+    // Get existing highlights for this book from Highlight collection
+    const existingHighlights = await Highlight.find({ bookId: book._id, userId, isActive: true });
+    
+    // Convert existing highlights to comparable format
+    const existingHighlightsData = existingHighlights.map(h => ({
+      highlight: h.highlight,
+      type: h.type,
+      page: h.page,
+      location: h.location,
+      timestamp: h.timestamp
+    }));
+
+    // Check for new highlights
+    let newHighlightsToSave = [];
+    if (isKindleUpload) {
+      newHighlightsToSave = checkForNewHighlightsForKindleUpload(bookData.highlights, existingHighlightsData);
+    } else {
+      const hasNewHighlights = checkForNewHighlights(bookData.highlights, existingHighlightsData);
+      if (hasNewHighlights) {
+        // Combine and purge overlapping highlights
+        const combinedHighlights = [...existingHighlightsData, ...bookData.highlights];
+        const purgedHighlights = parseHighlights.purgeOverlappingHighlightsBrute(combinedHighlights);
+        
+        // Find highlights that are in purged but not in existing
+        newHighlightsToSave = purgedHighlights.filter(purged => {
+          return !existingHighlightsData.some(existing => compareHighlights(purged, existing));
+        });
+      }
+    }
+
+    // Save new highlights to Highlight collection
+    if (newHighlightsToSave.length > 0) {
+      const highlightDocs = newHighlightsToSave.map(h => ({
+        bookId: book._id,
+        userId: userId,
+        highlight: String(h.highlight).trim(),
+        type: String(h.type).trim(),
+        page: String(h.page || '').trim(),
+        location: { 
+          start: Number(h.location.start), 
+          end: Number(h.location.end) 
+        },
+        timestamp: h.timestamp ? new Date(h.timestamp) : null,
+        knowledge_begin_date: h.timestamp ? new Date(h.timestamp) : new Date(),
+        knowledge_end_date: null,
+        isActive: true
+      })).filter(h => h.highlight !== ''); // Filter out empty highlights
+
+      if (highlightDocs.length > 0) {
+        await Highlight.insertMany(highlightDocs);
+        newHighlightsCount += highlightDocs.length;
+      }
+    }
   }
-  await Promise.all(savePromises);
-  return [newBook, newHighlights > 0 ? newHighlights : 0];
+
+  return [newBookCount, newHighlightsCount];
 }
 
 async function updateUserStats(newBook, newHighlights, newMaxHighlights, fallbackStats, userId) {
@@ -373,14 +376,26 @@ app.get('/user/book/:bookId', authenticate, async (req, res) => {
     return res.status(402).json({ message: `Not enough coins. You need ${DOWNLOAD_FEE_FOR_SINGLE_BOOK} coins to download this book.` });
   }
 
-  const book = await Book.findOne({ userId, _id: bookId }, 'title author highlights');
+  const book = await Book.findOne({ userId, _id: bookId }, 'title author');
   if (!book) {
     return res.status(404).json({ message: 'Book not found' });
   }
+  
+  // Fetch highlights from Highlight collection
+  const highlights = await Highlight.find({ bookId, userId, isActive: true });
+  
   // console.log(book)
   user.coins -= DOWNLOAD_FEE_FOR_SINGLE_BOOK;
   await user.save();
-  res.json({ book, coins: user.coins });
+  res.json({ 
+    book: {
+      _id: book._id,
+      title: book.title,
+      author: book.author,
+      highlights: highlights
+    }, 
+    coins: user.coins 
+  });
 });
 
 app.post('/user/upload-highlights-file', authenticate, upload.single('file'), async (req, res) => {
@@ -616,31 +631,22 @@ async function migrateHighlightKnowledgeDates() {
   try {
     console.log('Starting knowledge dates migration for highlights...');
     
-    const books = await Books.find({ highlights: { $exists: true, $ne: [] } });
+    // Now migrating in the Highlight collection
+    const highlights = await Highlight.find({ 
+      knowledge_begin_date: { $exists: false } 
+    });
+    
     let totalUpdated = 0;
 
-    for (const book of books) {
-      let modified = false;
-      
-      for (let i = 0; i < book.highlights.length; i++) {
-        const highlight = book.highlights[i];
-        if (!highlight.knowledge_begin_date) {
-          // Use set() to explicitly set the field
-          book.highlights[i].set('knowledge_begin_date', highlight.timestamp || new Date());
-          book.highlights[i].set('knowledge_end_date', null);
-          totalUpdated++;
-          modified = true;
-        }
-      }
-
-      if (modified) {
-        book.markModified('highlights');
-        await book.save();
-      }
+    for (const highlight of highlights) {
+      highlight.knowledge_begin_date = highlight.timestamp || new Date();
+      highlight.knowledge_end_date = null;
+      await highlight.save();
+      totalUpdated++;
     }
 
-    console.log(`Migration completed! Updated ${totalUpdated} highlights across ${books.length} books`);
-    return { success: true, totalUpdated, booksProcessed: books.length };
+    console.log(`Migration completed! Updated ${totalUpdated} highlights`);
+    return { success: true, totalUpdated };
     
   } catch (error) {
     console.error('Migration error:', error);

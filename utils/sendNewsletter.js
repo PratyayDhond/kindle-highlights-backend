@@ -1,54 +1,44 @@
 const newseletterTemplate = require('../mailTemplates/newsletter');
 const transporter = require('../mailer');
 const User = require('../models/User.js'); // Adjust path as needed
-const Books = require('../models/Books.js'); // Adjust path as needed
+const Highlight = require('../models/Highlight.js');
+const Books = require('../models/Books.js');
 
 const NEWSLETTER_HIGHLIGHTS_COUNT = process.env.NEWSLETTER_HIGHLIGHTS_COUNT || 10; // Default to 10 if not set
 
 async function getRandomHighlightsForUser(user) {
-    const highlightsForNewsletter = []
-    try{
-
-        const books = await Books.find({ userId: user._id });
-        if (!books || books.length === 0) {
-            return [];
-        }
-
-        const highlights = []
-
-        books.forEach(book => {
-            if (book.highlights && book.highlights.length > 0) {
-                book.highlights.forEach(highlight => {
-                    if(highlight.type === 'note')
-                        return; // Skip notes, only include highlights
-                    highlights.push({
-                        highlight: highlight.highlight,
-                        bookTitle: book.title,
-                        author: book.author,
-                        location: highlight.location,
-                        timestamp: highlight.timestamp,
-                        knowledge_begin_date: highlight.knowledge_begin_date,
-                        knowledge_end_date: highlight.knowledge_end_date
-                    });
-                });
+    try {
+        // Use aggregation pipeline with $sample for efficient random selection
+        const highlights = await Highlight.aggregate([
+            { $match: { userId: user._id, isActive: true, type: { $ne: 'note' } } },
+            { $sample: { size: parseInt(NEWSLETTER_HIGHLIGHTS_COUNT) } },
+            { 
+                $lookup: { 
+                    from: 'books', 
+                    localField: 'bookId', 
+                    foreignField: '_id', 
+                    as: 'book' 
+                } 
+            },
+            { $unwind: '$book' },
+            { 
+                $project: { 
+                    highlight: 1, 
+                    bookTitle: '$book.title', 
+                    author: '$book.author',
+                    location: 1,
+                    timestamp: 1,
+                    knowledge_begin_date: 1,
+                    knowledge_end_date: 1
+                } 
             }
-        });
+        ]);
 
-        for (let i = 0; i < Math.min(NEWSLETTER_HIGHLIGHTS_COUNT, highlights.length); i++) {
-            const randomIndex = Math.floor(Math.random() * highlights.length);
-            if(highlightsForNewsletter.includes(highlights[randomIndex])) {
-                i--; // If the highlight is already included, decrement i to try again
-                continue;
-            }
-            highlightsForNewsletter.push(highlights[randomIndex]);
-        }
-
-        highlights.length = 0
-    }catch(err) {
+        return highlights;
+    } catch(err) {
         console.error('Error fetching highlights for user:', err);
         return [];
     }
-    return highlightsForNewsletter;
 }
 
 async function sendNewsletter(){

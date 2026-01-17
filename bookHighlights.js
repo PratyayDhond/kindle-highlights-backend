@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const Books = require('./models/Books');
-const SoftDeletedBooks = require('./models/SoftDeletedBooks'); // Add this import
+const Highlight = require('./models/Highlight');
+const { softDeleteHighlight } = require('./utils/softDelete');
 const mongoose = require('mongoose');
 
 // Batch update highlights for a specific book
@@ -21,7 +22,7 @@ router.post('/user/book/:bookId/batch-update', async (req, res) => {
     // Validate operations array
 
 
-    // Find the book
+    // Find the book (to verify it exists)
     const book = await Books.findById(bookId);
     if (!book) {
       return res.status(404).json({ message: 'Book not found' });
@@ -37,7 +38,7 @@ router.post('/user/book/:bookId/batch-update', async (req, res) => {
     // Process each operation
     for (const operation of operations) {
       try {
-        await processOperation(book, operation, results);
+        await processOperation(bookId, operation, results);
       } catch (error) {
         results.failed.push({
           operationId: operation.id,
@@ -47,9 +48,6 @@ router.post('/user/book/:bookId/batch-update', async (req, res) => {
         });
       }
     }
-
-    // Save the book with all changes
-    await book.save();
 
     // Return results
     res.status(200).json({
@@ -71,7 +69,7 @@ router.post('/user/book/:bookId/batch-update', async (req, res) => {
 });
 
 // Helper function to process individual operations
-async function processOperation(book, operation, results) {
+async function processOperation(bookId, operation, results) {
   const { id, type, highlightId, originalHighlight, updatedHighlight, timestamp } = operation;
 
   // Validate operation structure
@@ -83,16 +81,17 @@ async function processOperation(book, operation, results) {
     throw new Error('Invalid operation type. Must be "edit" or "delete"');
   }
 
-  // Find the highlight in the book
-  const highlightIndex = book.highlights.findIndex(
-    highlight => highlight._id.toString() === highlightId
-  );
+  // Find the highlight in the Highlight collection
+  const currentHighlight = await Highlight.findById(highlightId);
 
-  if (highlightIndex === -1) {
-    throw new Error(`Highlight with ID ${highlightId} not found in book`);
+  if (!currentHighlight) {
+    throw new Error(`Highlight with ID ${highlightId} not found`);
   }
 
-  const currentHighlight = book.highlights[highlightIndex];
+  // Verify the highlight belongs to this book
+  if (currentHighlight.bookId.toString() !== bookId.toString()) {
+    throw new Error(`Highlight ${highlightId} does not belong to book ${bookId}`);
+  }
 
   // IMPROVED: Only check for conflicts if this is NOT an intentional edit
   // The conflict detection should verify that the current state matches what the user expects
@@ -103,11 +102,11 @@ async function processOperation(book, operation, results) {
 
   switch (type) {
     case 'edit':
-      await processEditOperation(book, highlightIndex, updatedHighlight, operation, results);
+      await processEditOperation(currentHighlight, updatedHighlight, operation, results);
       break;
       
     case 'delete':
-      await processDeleteOperation(book, highlightIndex, operation, results);
+      await processDeleteOperation(currentHighlight, operation, results);
       break;
       
     default:
@@ -116,21 +115,18 @@ async function processOperation(book, operation, results) {
 }
 
 // Process delete operation with soft delete
-async function processDeleteOperation(book, highlightIndex, operation, results) {
+async function processDeleteOperation(highlight, operation, results) {
   try {
-    const highlightToDelete = book.highlights[highlightIndex];
     const deletionReason = operation.deletionReason || 'user_deletion';
-    // Move highlight to SoftDeletedBooks collection
-    await moveHighlightToSoftDeleted(book, highlightToDelete, deletionReason);
     
-    // Remove the highlight from the array
-    book.highlights.splice(highlightIndex, 1);
+    // Use soft delete utility
+    await softDeleteHighlight(highlight._id, 'user', deletionReason);
 
     results.successful.push({
       operationId: operation.id,
       highlightId: operation.highlightId,
       type: 'delete',
-      message: 'Highlight deleted successfully and moved to soft delete collection'
+      message: 'Highlight soft-deleted successfully'
     });
 
   } catch (error) {
@@ -138,90 +134,35 @@ async function processDeleteOperation(book, highlightIndex, operation, results) 
   }
 }
 
-// Helper function to move highlight to soft deleted collection
-async function moveHighlightToSoftDeleted(book, highlightToDelete, deletionReason) {
-  try {
-    // Check if SoftDeletedBooks document already exists for this book
-    let softDeletedBook = await SoftDeletedBooks.findOne({
-      originalBookId: book._id,
-      userId: book.userId
-    });
-
-    // If no soft deleted book exists, create one
-    if (!softDeletedBook) {
-      softDeletedBook = new SoftDeletedBooks({
-        originalBookId: book._id,
-        userId: book.userId,
-        title: book.title,
-        author: book.author || null,
-        deletedHighlights: []
-      });
-    }
-
-    // Prepare the deleted highlight data
-    const deletedHighlightData = {
-      originalHighlightId: highlightToDelete._id,
-      highlight: highlightToDelete.highlight,
-      type: highlightToDelete.type,
-      page: highlightToDelete.page,
-      location: {
-        start: highlightToDelete.location.start,
-        end: highlightToDelete.location.end
-      },
-      timestamp: highlightToDelete.timestamp,
-      knowledge_begin_date: highlightToDelete.knowledge_begin_date,
-      knowledge_end_date: highlightToDelete.knowledge_end_date,
-      deletedAt: new Date(),
-      deletionReason: deletionReason
-    };
-
-    // Add the deleted highlight to the soft deleted book
-    softDeletedBook.deletedHighlights.push(deletedHighlightData);
-    softDeletedBook.updatedAt = new Date();
-
-    // Save the soft deleted book
-    await softDeletedBook.save();
-
-    console.log(`Highlight ${highlightToDelete._id} moved to soft delete collection`);
-
-  } catch (error) {
-    console.error('Error moving highlight to soft delete collection:', error);
-    throw error;
-  }
-}
-
-// Process edit operation (updated to handle soft delete for original content)
-async function processEditOperation(book, highlightIndex, updatedHighlight, operation, results) {
+// Process edit operation (store original in soft delete before editing)
+async function processEditOperation(highlight, updatedHighlight, operation, results) {
   if (!updatedHighlight) {
     throw new Error('Updated highlight data is required for edit operations');
   }
-
-  const currentHighlight = book.highlights[highlightIndex];
-  const deletionReason = 'edit_operation';
-  // Store original content in soft delete collection before editing
-  await moveHighlightToSoftDeleted(book, currentHighlight, deletionReason);
 
   // Apply updates to the highlight
   Object.keys(updatedHighlight).forEach(key => {
     if (updatedHighlight[key] !== undefined) {
       if (key === 'location' && typeof updatedHighlight[key] === 'object') {
         // Handle nested location object
-        currentHighlight.location = {
-          ...currentHighlight.location,
+        highlight.location = {
+          ...highlight.location.toObject(),
           ...updatedHighlight[key]
         };
       } else {
-        currentHighlight[key] = updatedHighlight[key];
+        highlight[key] = updatedHighlight[key];
       }
     }
   });
 
+  highlight.updatedAt = new Date();
+  await highlight.save();
     
-    results.successful.push({
-        operationId: operation.id,
-        highlightId: operation.highlightId,
-        type: 'edit',
-        message: 'Highlight updated successfully, original content preserved in soft delete collection'
+  results.successful.push({
+    operationId: operation.id,
+    highlightId: operation.highlightId,
+    type: 'edit',
+    message: 'Highlight updated successfully'
   });
 }
 

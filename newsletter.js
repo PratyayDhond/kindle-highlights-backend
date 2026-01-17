@@ -3,6 +3,45 @@ const express = require('express');
 const router = express.Router();
 const User = require('./models/User'); // Adjust path as needed
 const authenticate = require('./auth').authenticate; // Assuming you have an authenticate middleware
+const sendNewsletter = require('./utils/sendNewsletter'); // Import the sendNewsletter function
+
+const CRON_SECRET = process.env.CRON_SECRET; // Secret key for cron job authentication
+
+// Endpoint to trigger newsletter sending from external cron services (e.g., cron-job.org)
+router.get('/send-out-newsletter', async (req, res) => {
+  try {
+    // Validate the secret key from query params or headers
+    const secretFromQuery = req.query.secret;
+    const secretFromHeader = req.headers['x-cron-secret'];
+    const providedSecret = secretFromQuery || secretFromHeader;
+
+    if (!CRON_SECRET) {
+      console.error('CRON_SECRET environment variable is not set');
+      return res.status(500).json({ message: 'Server configuration error' });
+    }
+
+    if (!providedSecret || providedSecret !== CRON_SECRET) {
+      console.error('Unauthorized attempt to trigger newsletter');
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    console.log('Newsletter sending triggered by external cron job');
+    
+    // Run newsletter sending asynchronously and respond immediately
+    sendNewsletter()
+      .then(() => {
+        console.log('Newsletter sending completed successfully');
+      })
+      .catch((error) => {
+        console.error('Error during newsletter sending:', error);
+      });
+
+    res.status(200).json({ message: 'Newsletter sending triggered successfully' });
+  } catch (error) {
+    console.error('Error triggering newsletter:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
 
 router.post('/newsletter/subscribe', authenticate, async (req, res) => {
   try {
