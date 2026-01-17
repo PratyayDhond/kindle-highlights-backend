@@ -125,14 +125,13 @@ router.get('/user/highlights/search', authenticate, async (req, res) => {
     }
 
     // Get total count for pagination info
+    // We use regex for counting since $text can't be used in $or or with countDocuments reliably
+    const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const totalCount = await Highlight.countDocuments({
       userId: new mongoose.Types.ObjectId(userId),
       isActive: { $ne: false },
-      $or: [
-        { $text: { $search: searchQuery } },
-        { highlight: { $regex: searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } }
-      ]
-    }).catch(() => highlights.length); // Fallback if $text fails in count
+      highlight: { $regex: escapedQuery, $options: 'i' }
+    });
 
     res.json({
       highlights,
