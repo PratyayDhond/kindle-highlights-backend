@@ -3,7 +3,153 @@ const router = express.Router();
 const Books = require('./models/Books');
 const Highlight = require('./models/Highlight');
 const { softDeleteHighlight } = require('./utils/softDelete');
+const { authenticate } = require('./auth');
 const mongoose = require('mongoose');
+
+/**
+ * Search quotes/highlights for a user
+ * GET /user/highlights/search?q=searchQuery&limit=20&offset=0
+ * 
+ * Supports:
+ * - Full-text search with relevancy scoring
+ * - Fuzzy matching via regex fallback
+ * - Pagination with limit/offset
+ */
+router.get('/user/highlights/search', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { q: searchQuery, limit = 20, offset = 0 } = req.query;
+
+    if (!searchQuery || searchQuery.trim().length === 0) {
+      return res.status(400).json({ message: 'Search query is required' });
+    }
+
+    const limitNum = Math.min(Math.max(parseInt(limit) || 20, 1), 100); // 1-100
+    const offsetNum = Math.max(parseInt(offset) || 0, 0);
+
+    // First, try MongoDB text search (uses the text index, sorted by relevancy)
+    let highlights = await Highlight.aggregate([
+      {
+        $match: {
+          userId: new mongoose.Types.ObjectId(userId),
+          isActive: { $ne: false },
+          $text: { $search: searchQuery }
+        }
+      },
+      {
+        // Add text score for relevancy sorting
+        $addFields: { score: { $meta: 'textScore' } }
+      },
+      {
+        // Sort by relevancy (highest score first)
+        $sort: { score: -1 }
+      },
+      {
+        $skip: offsetNum
+      },
+      {
+        $limit: limitNum
+      },
+      {
+        // Lookup book details
+        $lookup: {
+          from: 'books',
+          localField: 'bookId',
+          foreignField: '_id',
+          as: 'book'
+        }
+      },
+      {
+        $unwind: { path: '$book', preserveNullAndEmptyArrays: true }
+      },
+      {
+        $project: {
+          _id: 1,
+          highlight: 1,
+          type: 1,
+          page: 1,
+          location: 1,
+          timestamp: 1,
+          score: 1,
+          bookId: 1,
+          bookTitle: '$book.title',
+          bookAuthor: '$book.author'
+        }
+      }
+    ]);
+
+    // If text search returns no results, fall back to regex (fuzzy) search
+    if (highlights.length === 0) {
+      // Escape special regex characters and create case-insensitive pattern
+      const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      
+      highlights = await Highlight.aggregate([
+        {
+          $match: {
+            userId: new mongoose.Types.ObjectId(userId),
+            isActive: { $ne: false },
+            highlight: { $regex: escapedQuery, $options: 'i' }
+          }
+        },
+        {
+          $skip: offsetNum
+        },
+        {
+          $limit: limitNum
+        },
+        {
+          $lookup: {
+            from: 'books',
+            localField: 'bookId',
+            foreignField: '_id',
+            as: 'book'
+          }
+        },
+        {
+          $unwind: { path: '$book', preserveNullAndEmptyArrays: true }
+        },
+        {
+          $project: {
+            _id: 1,
+            highlight: 1,
+            type: 1,
+            page: 1,
+            location: 1,
+            timestamp: 1,
+            bookId: 1,
+            bookTitle: '$book.title',
+            bookAuthor: '$book.author'
+          }
+        }
+      ]);
+    }
+
+    // Get total count for pagination info
+    const totalCount = await Highlight.countDocuments({
+      userId: new mongoose.Types.ObjectId(userId),
+      isActive: { $ne: false },
+      $or: [
+        { $text: { $search: searchQuery } },
+        { highlight: { $regex: searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } }
+      ]
+    }).catch(() => highlights.length); // Fallback if $text fails in count
+
+    res.json({
+      highlights,
+      pagination: {
+        total: totalCount,
+        limit: limitNum,
+        offset: offsetNum,
+        hasMore: offsetNum + highlights.length < totalCount
+      },
+      searchQuery
+    });
+
+  } catch (error) {
+    console.error('Quote search error:', error);
+    res.status(500).json({ message: 'Error searching highlights', error: error.message });
+  }
+});
 
 // Batch update highlights for a specific book
 router.post('/user/book/:bookId/batch-update', async (req, res) => {
