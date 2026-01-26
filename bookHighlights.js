@@ -123,7 +123,6 @@ router.get('/user/highlights/search', authenticate, async (req, res) => {
         }
       ]);
     }
-
     // Get total count for pagination info
     // We use regex for counting since $text can't be used in $or or with countDocuments reliably
     const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -373,5 +372,88 @@ function validateBatchOperations(req, res, next) {
 
 // Apply validation middleware to the route
 router.post('/user/book/:bookId/batch-update', validateBatchOperations);
+
+/**
+ * Add a user quote to their special "Added Quotes" book
+ * POST /user/add-quote
+ * Body: { quote: String }
+ * Auth required
+ */
+router.post('/user/add-quote', authenticate, async (req, res) => {
+  try {
+
+    const userId = req.user.userId;
+    const { quote } = req.body;
+
+    if (!quote || typeof quote !== 'string' || quote.trim().length === 0) {
+      return res.status(400).json({ message: 'Quote is required' });
+    }
+
+    // Fetch username from User model
+    const User = require('./models/User');
+    const userDoc = await User.findById(userId);
+    if (!userDoc) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    const username = userDoc.firstName ? userDoc.firstName : userDoc.email;
+
+    // Find or create the special book with all required metadata
+    const specialBookTitle = `${username} Added Quotes`;
+    let book = await Books.findOne({ userId, title: specialBookTitle, isActive: true });
+    let highlightCount, page, location, now = new Date();
+    let isNewBook = false;
+    if (!book) {
+      isNewBook = true;
+      book = await Books.create({
+        userId,
+        title: specialBookTitle,
+        author: 'user ' + username,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now
+      });
+      highlightCount = 1;
+      page = '1';
+    } else {
+      highlightCount = await Highlight.countDocuments({ bookId: book._id, isActive: true }) + 1;
+      page = Math.ceil(highlightCount / 10).toString();
+    }
+
+    // Check for duplicate highlight in this book
+    const existing = await Highlight.findOne({
+      userId,
+      bookId: book._id,
+      highlight: quote,
+      isActive: true
+    });
+    if (existing) {
+      return res.status(409).json({ message: 'Duplicate quote. Already exists.' });
+    }
+
+    // Set location to highlightCount for both start and end
+    location = { start: highlightCount, end: -1 };
+
+    // Create new highlight with all required metadata
+    const newHighlight = await Highlight.create({
+      userId,
+      bookId: book._id,
+      highlight: quote,
+      type: 'highlight',
+      page,
+      location,
+      timestamp: now,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+      knowledge_begin_date: now,
+      knowledge_end_date: null
+    });
+    console.log(`New quote added for user ID: ${userId} in book ID: ${book._id} (New Book: ${isNewBook}) : "${newHighlight}"`);
+    res.status(201).json({ message: 'Quote added successfully', highlight: newHighlight });
+  } catch (error) {
+    console.error('Add quote error:', error);
+    res.status(500).json({ message: 'Error adding quote', error: error.message });
+  }
+});
 
 module.exports = router;
