@@ -554,7 +554,7 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   
   // Start cron jobs after server is listening
-  startCronJob();
+  // startCronJob();
   startNewsletterJob();
   
   // Connect to MongoDB AFTER the server is listening

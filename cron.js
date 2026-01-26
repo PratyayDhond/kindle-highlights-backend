@@ -36,15 +36,15 @@ const newsletterJob = new cron.CronJob(NEWSLETTER_CRON_STRING, function () {
 }, null, true, 'Asia/Kolkata');
 
 module.exports = {
-  job,
-  startCronJob: () => {
-    job.start();
-    console.log('Cron job started');
-  },
-  stopCronJob: () => {
-    job.stop();
-    console.log('Cron job stopped');
-  },
+  // // job,
+  // startCronJob: () => {
+  //   job.start();
+  //   console.log('Cron job started');
+  // },
+  // stopCronJob: () => {
+  //   job.stop();
+  //   console.log('Cron job stopped');
+  // },
   newsletterJob,
   startNewsletterJob: () => {
     newsletterJob.start();
