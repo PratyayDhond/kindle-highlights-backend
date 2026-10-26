@@ -309,7 +309,7 @@ app.post('/get-user-highlights-json', authenticate, upload.single('file'), async
       return res.status(highlightsData.statusCode).json({ message: highlightsData.message });
     }
     // console.log(highlights);
-    console.log(highlights.length, 'highlights found');
+    console.log(highlightsData.stats.totalHighlights, 'highlights found');
     const uniqueBooks = highlights.length;
     const totalFee = uniqueBooks * PROCESSING_FEE_PER_BOOK * DOWNLOAD_FEE_FOR_HIGHLIGHTS;
     console.log("Total fee for processing:", totalFee, "for", uniqueBooks, "books");
@@ -423,7 +423,7 @@ app.post('/user/upload-highlights-file', authenticate, upload.single('file'), as
     if (highlightsData.status === 'error') {
       return res.status(highlightsData.statusCode).json({ message: highlightsData.message });
     }
-    console.log(highlights.length, 'highlights found');
+    console.log(highlightsData.stats.totalHighlights, 'highlights found');
     const uniqueBooks = highlights.length;
     const totalFee = uniqueBooks * PROCESSING_FEE_PER_BOOK;
     console.log("Total fee for processing:", totalFee, "for", uniqueBooks, "books");

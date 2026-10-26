@@ -44,7 +44,8 @@ function parseHighlights(fileContent) {
             // Here we are setting error code to 418 (I'm a teapot) as a playful way to indicate that the file is not a valid Kindle clippings file.
             return {status: 'error', message: 'Incorrect file uploaded. Please upload a valid Kindle clippings file.', statusCode: 418};
         }
-        i+= 1; // skip the next line which is a separator
+        // Move from the metadata line to the highlight/note content.
+        i++;
         //  console.log("Current Line:", rawData[i]);
         while( i < rawData.length && rawData[i].trim() !== note_sep){
             currentNote += rawData[i].trim() + '\n';
@@ -57,6 +58,9 @@ function parseHighlights(fileContent) {
 
         if(currentNote === '') {
             console.warn('Empty highlight/note found, skipping...');
+            while(i < rawData.length && rawData[i].trimRight() === note_sep) {
+                i++;
+            }
             continue;
         }
         
